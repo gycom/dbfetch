@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quick Time Entry Worksheet</title>
+    <style>
+        input {margin-right:10px;}
+        img.imgaction {cursor:pointer;width:24px;}
+        li:hover{background-color:#f0f0f0;}
+        menu {background-color:white;margin:0;padding:0;}
+        menu.li:hover {cursor:pointer}
+        #actionbox ul {margin:0;padding:0;cursor:pointer;list-style-type:none;}
+        #customerlookup {
+            position:absolute;
+            width:auto;
+            height:auto;
+            max-height:80vh;
+            overflow-y:scroll;
+            top:20px;
+            left:100px;
+            background-color:white;
+            z-index:100;
+            margin:0;
+            padding:0;
+            border:2px solid black;    
+        }
+        #joblookup {
+            position:absolute;
+            width:auto;
+            height:auto;
+            max-height:80vh;
+            overflow-y:scroll;
+            top:20px;
+            left:100px;
+            background-color:white;
+            z-index:100;
+            margin:0;
+            padding:0;
+            border:2px solid black;    
+        }
+        #actionbox{
+            position:absolute;
+            width:auto;
+            height:auto;
+            background-color:white;
+            z-index:100;
+            margin:0;
+            padding:0;
+        }
+        #shadow {
+            top:0;
+            left:0;
+            position:absolute;
+            width:100%;
+            height:100%;
+            background-color:black;
+            opacity:0.1;
+            z-index:90;
+            margin:0;
+            padding:0;
+        }
+        input{border:1px dotted green;background-color:none;}
+        input:selected{border:2px solid black}
+        li > .imgaction {visibility:hidden}
+        li:hover > .imgaction {visibility:visible}
+    </style>
+    <link rel="stylesheet" href="simplepicker.css" />
+    <script>
+        window.onload=window.setTimeout(bodyLoad,1000);
+        var displaymode = "BASIC";
+        var state = {user:undefined};
+        var userlist = [];
+        var customerjob = [];
+        var productoperation = [];
+        var root;
+        //alert(document.location.host)
+        if (document.location.host.substr(0,3)!="127")
+            root="http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
+        else
+            root="http://localhost:8100/";
+
+        function bodyLoad()
+        {
+            document.getElementById("activeuser").innerText="... loading data ...";
+            Promise.all(
+                [
+                    fetch(root + "api.asp?perform=version").then(response=>response.text())
+                    , fetch(root + "api.asp?perform=refcustomerjob").then(response=>response.json())
+                    , fetch(root + "api.asp?perform=refproductoperation").then(response=>response.json())
+                ]
+            ).then((rep)=>{
+                customerjob = rep[1];
+                productoperation = rep[2]
+                start(state,rep[0]);
+            }).catch(err=>{
+                document.getElementById("activeuser").innerHTML = "ERROR: " + err.message;
+                console.error(err)
+            });
+        }
+        function start(state,version)
+        {
+            fetch(root+"api.asp?perform=userlist")
+                .then(response=>response.json())
+                .then(json=>builduserlist(trimname(json)))
+        }
+        function trimname(json)
+        {
+            return json.map(trimMe);
+            function trimMe(e)
+            {
+                e.NAME_OF_USER=e.NAME_OF_USER.trim();
+                e.USER_ID=e.USER_ID.trim();
+                return e;
+            }
+        }
+        function builduserlist(json)
+        {
+            var cookieuser=window.localStorage.getItem("user");
+            var div=document.getElementById("activeuser");
+            div.innerHTML = "<select id='userid' onchange='selectUser()'><option value=''>--choose user--</option>" + json.sort(NameAlpha).map(renderuser).join("")+"</select>";
+            selectUser();
+            function NameAlpha(a,b)
+            {
+                var a_name=a.NAME_OF_USER.split(" ")[1];
+                var b_name=b.NAME_OF_USER.split(" ")[1];
+                return a_name>b_name?1:a_name<b_name?-1:0;
+            }
+            function renderuser(e)
+            {
+                var selected="";
+                if (e.USER_ID==cookieuser) selected=" selected ";
+                return "<option "+selected+" value='"+e.USER_ID+"'>"+e.NAME_OF_USER+"</option>";
+            }
+        }
+        function selectUser()
+        {
+            var user=document.getElementById("userid").value;
+            state={user:user};
+            window.localStorage.setItem("user",user);
+            if (user=="") setuserdata([]);
+            else
+            fetch(root+"api.asp?perform=getuser&userid="+state.user)
+                .then(response=>response.json())
+                .then(json=>setuserdata(json))
+                .catch(err=>console.log("fetch data error ",err));
+        }
+        function setuserdata(json)
+        {
+            if (state.user!="")
+            {
+                state.data = json;
+                displaydata();
+                if (json.length==0) ActionNew();
+            }
+            else
+            {
+                state.data = [];
+                displaydata();
+            }
+
+        }
+        function displaydata()
+        {
+            var div=document.getElementById("userdata");
+            switch(displaymode)
+            {
+                case "BASIC": div.innerHTML=BasicDisplay();
+                default: displaymode="BASIC";BasicDisplay();
+            }
+        }
+        function BasicDisplay()
+        {
+            console.log(state.data);
+            return state.data.map(basicrow).join("");
+            function basicrow(e)
+            {
+                return ["<li id='"+e.WIP_ID+"' title='"+e.WIP_ID+"' onchange='Change(this)'>"
+                    ,boxCustomer(e,"CUSTOMER_ID")
+                    ,box(e,"JOB_ID",5)
+                    ,boxcalendar(e,"PUNCH_DATE")
+                    ,box(e,"PUNCH_OPERATION")
+                    ,box(e,"PUNCH_DURATION",4)
+                    ,box(e,"TICKET_REF",8)
+                    ,box(e,"COMMENT_ID")
+                    ,ellipsis(e)
+                    ,"</li>"].join("");
+            }
+            function box(e,key,size)
+            {
+                var txt=e[key];
+                return "<input type='text' name='"+key+"' value='"+(txt||"")+"' size='"+(size||"15")+"' autocomplete='off'>";
+            }
+            function boxCustomer(e,key,size)
+            {
+                var txt=e[key];
+                return "<input type='text' name='"+key+"' value='"+(txt||"")+"' size='"+(size||"15")+"' ondblclick='PopCustomerLookup(this)' autocomplete='off'>";
+            }
+            function boxcalendar(e,key,size)
+            {
+                var txt=e[key];
+                return "<input type='text' name='"+key+"' value='"+(txt||"")+"' size='"+(size||"10")+"' ondblclick='PopCalendar(this)' autocomplete='off'>";
+            }
+            function ellipsis(e)
+            {
+                return "<img class='imgaction' src='more.png' align=absmiddle onclick='popAction("+e.WIP_ID+")'/>";
+            }
+        }
+        function popAction(wipid)
+        {
+            var div = loadingOn("actionbox");
+            div.innerHTML = ["<ul class='menu' onclick='DoAction("+wipid+")'>"
+                ,["New","Copy","Delete"].map(t=>"<li>"+t+"</li>").join("")
+                ,"</ul>"].join("");
+            div.style.top = window.event.clientY+"px";
+            div.style.left = window.event.clientX+"px";
+            document.body.appendChild(div);
+        }
+        function clearAction()
+        {
+            loadingOff();
+        }
+        var shielded=null;
+        function loadingOn(toShield)
+        {
+            shielded=toShield;
+            var div=document.createElement("div");
+            div.id="shadow"
+            div.onclick = loadingOff;
+            document.body.appendChild(div);
+            var pop = document.createElement("div");
+            pop.id=toShield;
+            return pop;
+        }
+        function loadingOff()
+        {
+            console.log("shield",shielded);
+            var pop = document.getElementById(shielded);
+            document.body.removeChild(pop);
+            var div=document.getElementById("shadow");
+            div.onclick = null;
+            document.body.removeChild(div);
+        }
+        function DoAction(wipid)
+        {
+            console.log("Do action...");
+            var ev = window.event;
+            var action=ev.srcElement.innerText;
+            console.log("Action "+action + " " + wipid)
+            switch(action)
+            {
+                case "New": ActionNew(); break;
+                case "Copy": ActionCopy(wipid); break;
+                case "Delete": ActionDelete(wipid); break;
+            }
+            clearAction();
+        }
+        function ActionNew()
+        {
+            fetch(root+"api.asp?perform=createnew&userid="+state.user)
+                .then(response=>response.json())
+                .then(json=>{
+                    console.log(json);
+                    state.data.push(json[0]);
+                    displaydata();
+                })
+                .catch(err=>console.log(err));
+        }
+        function ActionCopy(wipid)
+        {
+            fetch(root+"api.asp?perform=duplicateone&userid="+state.user+"&wipid="+wipid)
+                .then(response=>response.json())
+                .then(json=>{
+                    console.log(json);
+                    state.data.push(json[0]);
+                    displaydata();
+                })
+                .catch(err=>console.log(err));
+        }
+        function ActionDelete(wipid)
+        {
+            fetch(root+"api.asp?perform=deleteone&userid="+state.user+"&wipid="+wipid)
+                .then(response=>response.json())
+                .then(json=>{
+                    console.log(json);
+                    state.data = state.data.filter((d)=>d.WIP_ID!=wipid);
+                    displaydata();
+                })
+                .catch(err=>console.log(err));
+        }
+        function Change(li,input)
+        {
+            var wipid = li.id; // find parent <li>
+            if (!input)
+                var obj = window.event.srcElement;
+            else
+                var obj = input;
+            if (obj.tagName=="INPUT") console.log(obj.name,obj.value);
+            var data = "";
+/*            input.forEach((n)=>{
+                //console.log(n.name, n.value);
+                if (n.name==obj.name) data=obj.name+"='"+obj.value+"'";
+            })*/
+            data = obj.name +"='" + obj.value + "'";
+            fetch(root+"api.asp?perform=updateone&userid="+state.user+"&wipid="+wipid+"&data="+decodeURIComponent(data))
+                .then(response=>response.json())
+                .then(json=>{
+                    console.log("changing",json)
+                })
+                .catch(err=>console.log(err));
+//            console.log(obj)
+        }
+        function PopCalendar(obj)
+        {
+            var simplepicker = new SimplePicker({zIndex:100});
+            simplepicker.open();
+            simplepicker.on("close",(date)=>{
+                
+            });
+            simplepicker.on("submit",(date,readableDate)=>{
+                obj.value=date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate());
+                console.log(obj)
+            })
+            function pad(n)
+            {
+                if (n<10) return "0"+n;
+                return ""+n;
+            }
+        }
+        function PopCustomerLookup(obj)
+        {
+            var wipid = obj.parentElement.id; // find parent <li>
+            var div=loadingOn("customerlookup");
+            div.innerHTML = ["<ul class='menu' onclick='CloseCustomerLookup("+wipid+")'>"
+                , customerjob.reduce(distinctCustomer,[]).map(renderCustomer).join("")
+                ,"</ul>"].join("");
+            document.body.appendChild(div);
+            function distinctCustomer(t,e)
+            {
+                if (t.filter((c)=>c.CUSTOMER_ID==e.CUSTOMER_ID).length==0)
+                {
+                    t.push({CUSTOMER_ID:e.CUSTOMER_ID,CUSTOMER_NAME:e.CUSTOMER_NAME})
+                }
+                return t;
+            }
+            function renderCustomer(e)
+            {
+                return "<li customer='" + e.CUSTOMER_ID + "'>" + e.CUSTOMER_ID + "&nbsp;&nbsp;&nbsp;" + e.CUSTOMER_NAME+"</li>";
+            }
+        }
+        function CloseCustomerLookup(wipid)
+        {
+            if (wipid)
+            {
+                var src = window.event.srcElement;
+                var customer = src.getAttribute("customer");
+                var line = document.getElementById(wipid)
+                var input = line.querySelector("input");
+                input.value=customer;
+                Change(line,input);
+            }
+            loadingOff();
+        }
+        function PopJobLookup(obj)
+        {
+            var wipid = obj.parentElement.id; // find parent <li>
+            var div=loadingOn("joblookup");
+            div.innerHTML = ["<ul class='menu' onclick='CloseJobLookup("+wipid+")'>"
+                , customerjob.reduce(distinctCustomer,[]).map(renderCustomer).join("")
+                ,"</ul>"].join("");
+            document.body.appendChild(div);
+            function distinctCustomer(t,e)
+            {
+                if (t.filter((c)=>c.CUSTOMER_ID==e.CUSTOMER_ID).length==0)
+                {
+                    t.push({CUSTOMER_ID:e.CUSTOMER_ID,CUSTOMER_NAME:e.CUSTOMER_NAME})
+                }
+                return t;
+            }
+            function renderCustomer(e)
+            {
+                return "<li customer='" + e.CUSTOMER_ID + "'>" + e.CUSTOMER_ID + "&nbsp;&nbsp;&nbsp;" + e.CUSTOMER_NAME+"</li>";
+            }
+        }
+        function CloseJobLookup(wipid)
+        {
+            if (wipid)
+            {
+                var src = window.event.srcElement;
+                var customer = src.getAttribute("customer");
+                var line = document.getElementById(wipid)
+                var input = line.querySelector("input");
+                input.value=customer;
+                Change(line,input);
+            }
+            loadingOff();
+        }
+    </script>
+</head>
+<body>
+    <h1>Quick Time Entry Worksheet</h1>
+    <div id="activeuser"></div>
+    <div id="userdata"></div>
+    <script src="./simplepicker.js"></script>
+    <script>
+    </script>
+</body>
+</html>

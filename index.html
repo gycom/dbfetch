@@ -64,6 +64,9 @@
         input:selected{border:2px solid black}
         li > .imgaction {visibility:hidden}
         li:hover > .imgaction {visibility:visible}
+        ul >li.row {list-style-type:none;}
+        li.row {cursor:pointer}
+        span.col {width:100px;display:inline-block;}
     </style>
     <link rel="stylesheet" href="simplepicker.css" />
     <script>
@@ -90,13 +93,27 @@
                     , fetch(root + "api.asp?perform=refproductoperation").then(response=>response.json())
                 ]
             ).then((rep)=>{
-                customerjob = rep[1];
-                productoperation = rep[2]
+                customerjob = rep[1].map(normalizeCustomer);
+                productoperation = rep[2].map(normalizeProduct);
                 start(state,rep[0]);
             }).catch(err=>{
                 document.getElementById("activeuser").innerHTML = "ERROR: " + err.message;
                 console.error(err)
             });
+            function normalizeCustomer(e)
+            {
+                var x = e;
+                x.CUSTOMER_ID = x.CUSTOMER_ID.trim();
+                x.CUSTOMER_NAME = x.CUSTOMER_NAME.trim();
+                x.PRODUCT_ID = x.PRODUCT_ID.trim();
+                return x;
+            }
+            function normalizeProduct(e)
+            {
+                var x=e;
+                x.PRODUCT_ID = x.PRODUCT_ID.trim();
+                return x;
+            }
         }
         function start(state,version)
         {
@@ -327,9 +344,16 @@
                 return ""+n;
             }
         }
+        function parentLI(obj)
+        {
+            while (obj.tagName!="LI")
+                obj = obj.parentElement;
+            return obj;
+        }
         function PopCustomerLookup(obj)
         {
-            var wipid = obj.parentElement.id; // find parent <li>
+            var wipid = parentLI(obj).id; // find parent <li>
+            console.log("wipid",wipid);
             var div=loadingOn("customerlookup");
             div.innerHTML = ["<ul class='menu' onclick='CloseCustomerLookup("+wipid+")'>"
                 , customerjob.reduce(distinctCustomer,[]).map(renderCustomer).join("")
@@ -345,15 +369,17 @@
             }
             function renderCustomer(e)
             {
-                return "<li customer='" + e.CUSTOMER_ID + "'>" + e.CUSTOMER_ID + "&nbsp;&nbsp;&nbsp;" + e.CUSTOMER_NAME+"</li>";
+                return "<li class='row' customer='" + e.CUSTOMER_ID + "'><span class='col'>" + e.CUSTOMER_ID + "</span>" + e.CUSTOMER_NAME+"</li>";
             }
         }
         function CloseCustomerLookup(wipid)
         {
             if (wipid)
             {
-                var src = window.event.srcElement;
+                console.log("close",wipid);
+                var src = parentLI(window.event.srcElement);
                 var customer = src.getAttribute("customer");
+                console.log(src)
                 var line = document.getElementById(wipid)
                 var input = line.querySelector("input");
                 input.value=customer;
@@ -363,7 +389,7 @@
         }
         function PopJobLookup(obj)
         {
-            var wipid = obj.parentElement.id; // find parent <li>
+            var wipid = parentLI(obj).id; // find parent <li>
             var div=loadingOn("joblookup");
             div.innerHTML = ["<ul class='menu' onclick='CloseJobLookup("+wipid+")'>"
                 , customerjob.reduce(distinctCustomer,[]).map(renderCustomer).join("")
@@ -379,7 +405,7 @@
             }
             function renderCustomer(e)
             {
-                return "<li customer='" + e.CUSTOMER_ID + "'>" + e.CUSTOMER_ID + "&nbsp;&nbsp;&nbsp;" + e.CUSTOMER_NAME+"</li>";
+                return "<li class='row' customer='" + e.CUSTOMER_ID + "'><span class='col'>" + e.CUSTOMER_ID + "</span>" + e.CUSTOMER_NAME+"</li>";
             }
         }
         function CloseJobLookup(wipid)

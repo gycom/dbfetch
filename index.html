@@ -39,7 +39,7 @@
             height:auto;
             max-height:80vh;
             overflow-y:scroll;
-            top:20px;
+            top:200px;
             left:100px;
             background-color:white;
             z-index:100;
@@ -53,7 +53,7 @@
             height:auto;
             max-height:80vh;
             overflow-y:scroll;
-            top:20px;
+            top:200px;
             left:100px;
             background-color:white;
             z-index:100;
@@ -90,6 +90,8 @@
         ul >li.row {list-style-type:none;}
         li.row {cursor:pointer}
         span.col {width:100px;display:inline-block;}
+        #activeuser {}
+        .toolbar {float:right;margin-right:50px}
     </style>
     <link rel="stylesheet" href="simplepicker.css" />
     <script>
@@ -101,7 +103,8 @@
         var productoperation = [];
         var root;
         //alert(document.location.host)
-        if (document.location.host.substr(0,3)!="127")
+        console.log("api url",document.location.host.substr(0,3))
+        if (document.location.host.substr(0,3)!="127.")
             root="http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
         else
             root="http://localhost:8100/";
@@ -233,17 +236,17 @@
                     ,boxCustomer(e,"CUSTOMER_ID")
                     ,boxJob(e,"JOB_ID",5)
                     ,boxcalendar(e,"PUNCH_DATE")
-                    ,boxOperation(e,"PUNCH_OPERATION",3)
+                    ,boxOperation(e,"PUNCH_OPERATION",4)
                     ,box(e,"PUNCH_DURATION",4)
                     ,box(e,"TICKET_REF",8)
-                    ,box(e,"COMMENT_ID")
+                    ,boxComment(e,"COMMENT_ID")
                     ,ellipsis(e)
                     ,"</li>"].join("");
             }
             function basictitle()
             {
                 return ("<table style='font-weight:bolder;'>"
-                    + [20,150,80,110,110,80,100].map(maketitlecol).join("") 
+                    + [20,120,50,60,60,80,100].map(maketitlecol).join("") 
                     + "<tr>" 
                     + [ "","Client"  ,"Job"   ,"Date"   ,"Operation"   ,"Duration"   ,"Ticket Ref"   ,"Comments"].map(maketitleheader).join("")
                     + "</tr>" 
@@ -278,7 +281,13 @@
                 var txt=e[key];
                 return "<input type='text' name='"+key+"' value='"+(txt||"")+"' size='"+(size||"15")+"' ondblclick='PopOperationLookup(this)' autocomplete='off'>";
             }
-            
+            function boxComment(e,key)
+            {
+                var txt=e[key];
+                return ("<input type='hidden' name='"+key+"' value='"+(txt||"")+"'>"
+                        +"<img src='ConfirmationMemo.gif' width=20px onclick='PopComment(this)' style='margin-right:30px' />"
+                        );
+            }
             function boxcalendar(e,key,size)
             {
                 var txt=e[key];
@@ -526,10 +535,26 @@
             }
             loadingOff();
         }
+        function validateall()
+        {
+            alert("todo...");
+        }
+        function convertpunch()
+        {
+            alert("todo...");
+        }
+        function PopComment(obj)
+        {
+            alert("todo...")
+        }
     </script>
 </head>
 <body>
     <h1 class="header"><img src="./Cyframe.gif" width=64 height64 align="absmiddle">Quick Time Entry Sheet
+        <span class="toolbar">
+            <button onclick="validateall()">Validate</button>
+            <button onclick="convertpunch()">Convert to Punch</button>
+        </span>
         <div id="activeuser"></div>
     </h1>
     <div id="userdata"></div>

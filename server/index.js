@@ -13,6 +13,8 @@ app.use(express.static(staticroot));
 app.use(cors({origin:"*"}));
 app.use(bodyParser.urlencoded({extended:false}));
 app.get("/api.asp",apiResponder);
+app.post("/actJiraSync.asp",apiJiraSync);
+app.post("/actJiraList.asp",apiJiraList);
 app.listen(port,()=>{console.log("listening localhost:"+port)})
 
 
@@ -133,4 +135,31 @@ function deleteone(req,res)
     var current = returndata(wipid);
     current.DELETED_YN="Y";
     res.send([current]);
+}
+
+function apiJiraList(req,res)
+{
+    var ticketlist = {
+        result: JSON.stringify({issues:
+            [
+                {
+                    key:"CS-0000",
+                    fields:{
+                        summary:"desc cs-0000"
+                    }
+                }
+            ]}
+            )
+    };
+    res.send(JSON.stringify(ticketlist));
+}
+
+function apiJiraSync(req,res)
+{
+    var jiraNum = req.body.ROW_DATA;
+    if (jiraNum) jiraNum=JSON.parse(jiraNum).JiraTaskNum;
+    var ticketdesc = {
+        jrSummary:"Generic Ticket " + jiraNum
+    };
+    res.send(ticketdesc);
 }

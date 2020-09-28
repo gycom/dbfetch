@@ -15,9 +15,11 @@
         #usernameslot {font-size:16px}
         input {margin-right:10px;}
         img.imgaction {cursor:pointer;width:24px;}
+        span.imgactionfiller{display:inline-block;width:24px}
         li:hover{background-color:#f0f0f0;}
         menu {background-color:white;margin:0;padding:0;}
         menu.li:hover {cursor:pointer}
+        .userdatalist{list-style-type:none;margin:0;padding:0;}
         #actionbox ul {margin:0;padding:0;cursor:pointer;list-style-type:none;}
         #customerlookup {
             position:absolute;
@@ -107,14 +109,16 @@
         #activeuser {display:block;}
         .toolbar {float:right;margin-right:50px}
         .JiraText {width:100px;overflow-x:hidden;text-overflow:ellipsis;}
-        .col-0 {width:10px;display:inline-block;margin-right:10px;}
+
+        .col-check{width:10px;display:inline-block;margin-right:15px;}
+        .col-0 {width:30px;display:inline-block;margin-right:10px;}
         .col-1 {width:100px;display:inline-block;margin-right:10px;}
         .col-2 {width:100px;display:inline-block;margin-right:10px;}
         .col-3 {width:100px;display:inline-block;margin-right:10px;}
         .col-4 {width:100px;display:inline-block;margin-right:10px;}
         .col-5 {width:100px;display:inline-block;margin-right:10px;}
-        .col-6 {width:100px;display:inline-block;margin-right:10px;}
-        .col-7 {width:200px;display:inline-block;margin-right:10px;}
+        .col-6 {width:110px;display:inline-block;margin-right:10px;}
+        .col-7 {width:50px;display:inline-block;margin-right:10px;}
         .col-8 {width:100px;display:inline-block;margin-right:10px;}
     </style>
     <link rel="stylesheet" href="simplepicker.css" />
@@ -130,7 +134,8 @@
         var csroot;
         //alert(document.location.host)
         console.log("api url",document.location.host.substr(0,3))
-        if (document.location.host.substr(0,3)!="127.")
+        var fake=false;
+        if (!fake)
         {    
             root="http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
             csroot="http://jtcyframe.prod.intranet.cyframe.com/punch/ReviewTimeSheet/";
@@ -162,6 +167,7 @@
                 customerjob = rep[1].map(normalizeCustomer);
                 productoperation = rep[2].map(normalizeProduct);
                 ticketlist = JSON.parse(rep[3].result).issues;
+                console.log("ticketlist",ticketlist);
                 start(state,rep[0]);
             }).catch(err=>{
                 document.getElementById("activeuser").innerHTML = "ERROR: " + err.message;
@@ -273,23 +279,31 @@
             return basictitle() + state.data.map(basicrow).join("");
             function basicrow(e)
             {
-                return ["<li id='"+e.WIP_ID+"' title='"+e.WIP_ID+"' onchange='Change(this)'>"
+                return ["<li id='"+e.WIP_ID+"' title='"+e.WIP_ID+"' onchange='Change(this)' class='userdatalist'>"
+                    ,ellipsis(e)
+                    ,"<span class='col-check'>"+checkbox(e,"CHECKED_YN")+"</span>"
                     ,"<span class='col-1'>"+boxCustomer(e,"CUSTOMER_ID",12)+"</span>"
                     ,"<span class='col-2'>"+boxJob(e,"JOB_ID",5)+"</span>"
                     ,"<span class='col-3'>"+boxcalendar(e,"PUNCH_DATE",10)+"</span>"
                     ,"<span class='col-4'>"+boxOperation(e,"PUNCH_OPERATION",4)+"</span>"
                     ,"<span class='col-5'>"+box(e,"PUNCH_DURATION",4)+"</span>"
-                    ,"<span class='col-6'>"+boxComment(e,"COMMENT_ID")+"</span>"
-                    ,"<span class='col-7'>"+boxJira(e,"TICKET_REF",8)+"</span>"
-                    ,ellipsis(e)
+                    ,"<span class='col-6'>"+boxJira(e,"TICKET_REF",8)+"</span>"
+                    ,"<span class='col-7'>"+boxComment(e,"COMMENT_ID")+"</span>"
+                    ,jiradesc()
                     ,"</li>"].join("");
             }
             function basictitle()
             {
                 return ("<table style='font-weight:bolder;'>"
-                    //+ [20,120,50,60,60,80,100].map(maketitlecol).join("") 
                     + "<tr>" 
-                    + [ "","Client"  ,"Job"   ,"Date"   ,"Operation"   ,"Duration"   ,"Comments"   ,"Ticket Ref"].map(maketitleheader).join("")
+                    + [ checkAllBox()
+                        ,"Client"  
+                        ,"Job"   
+                        ,"Date"   
+                        ,"Operation"   
+                        ,"Duration"   
+                        ,"Ticket Ref"
+                        ,"Comments"   ].map(maketitleheader).join("")
                     + "</tr>" 
                     + "</table>"
                 );
@@ -301,6 +315,10 @@
                 {
                     return "<td class='col-"+n+"'>"+h+"</td>";
                 }
+            }
+            function checkAllBox()
+            {
+                return "<nobr><span class='imgactionfiller'></span><input type='checkbox' name='CHECK_ALL' onclick='checkAll()'></nobr>";
             }
             function box(e,key,size)
             {
@@ -329,6 +347,13 @@
                         +"<img src='ConfirmationMemo.gif' width=16px align=absmiddle onclick='PopComment(this)' style='margin-right:30px;"+(!txt?"opacity:.5":"")+"' />"
                         );
             }
+            function checkbox(e,key)
+            {
+                var txt=e[key];
+                return (
+                    "<input type='checkbox' name='" + key + "' " + (txt=="Y"?"checked":"") + " onclick='Activate(parentLI(this))' value='Y'>"
+                );
+            }
             function boxcalendar(e,key,size)
             {
                 var txt=(e[key]||"").substr(0,10);
@@ -338,7 +363,13 @@
             {
                 var txt=e[key]||"";
                 if (txt.substr(0,3).toUpperCase()=="CS-") txt=txt.substr(3);
-                return "CS-<input type='text' name='"+key+"' maxlength=4 value='"+(txt||"")+"' size='"+(size||"10")+"'  onchange='LoadJira(this)' ondblclick='PopTicketLookup(this)' autocomplete='off'><span class='JiraText'></span>";
+                return ("CS-<input type='text' name='"+key+"' maxlength=4 value='"+(txt||"")+"' size='"+(size||"10")+"'  onchange='LoadJira(this)' ondblclick='PopTicketLookup(this)' autocomplete='off'>"
+                );
+            }
+            function jiradesc()
+            {
+                return "<span class='JiraText'></span>";
+
             }
             function ellipsis(e)
             {
@@ -427,6 +458,10 @@
                 })
                 .catch(err=>console.log(err));
         }
+        function Activate(li,input)
+        {
+            var wipid = li.id;
+        }
         function Change(li,input)
         {
             var wipid = li.id; // find parent <li>
@@ -436,11 +471,22 @@
                 var obj = input;
             if (obj.tagName=="INPUT") console.log(obj.name,obj.value);
             var data = "";
-/*            input.forEach((n)=>{
-                //console.log(n.name, n.value);
-                if (n.name==obj.name) data=obj.name+"='"+obj.value+"'";
-            })*/
-            data = obj.name +"='" + obj.value + "'";
+            if (obj.type=="checkbox")
+            {
+                data = obj.name +"='" + (obj.checked?"Y":"N") + "'";
+            }
+            else
+            {
+                switch(obj.name)
+                {
+                    case "PUNCH_DATE": 
+                        data = obj.name + "=TO_DATE('"+obj.value+"','YYYY-MM-DD')"; 
+                        break;
+                    default:
+                        data = obj.name + "='" + obj.value + "'";
+                        break;
+                }
+            }
             fetch(root+"api.asp?perform=updateone&userid="+state.user+"&wipid="+wipid+"&data="+decodeURIComponent(data))
                 .then(response=>response.json())
                 .then(json=>{
@@ -451,6 +497,10 @@
         }
         function PopCalendar(obj)
         {
+            var date=new Date();
+            obj.value=date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate());
+            Change(parentLI(obj),obj);
+            return;
             var simplepicker = new SimplePicker({zIndex:100});
             simplepicker.open();
             simplepicker.on("close",(date)=>{
@@ -491,7 +541,13 @@
             }*/
             function renderTicket(e)
             {
-                return "<li class='row' ticket='" + e.key + "'><span class='col'>" + e.key + "</span>" + e.fields.summary +"</li>";
+                return ("<li class='row' ticket='" + e.key + "'>"
+                        + "<span class='col'>" 
+                        + e.key 
+                        + "</span>" 
+                        + e.fields.summary 
+                        + "</li>"
+                );
             }
         }
         function CloseTicketLookup(wipid)
@@ -542,7 +598,7 @@
                 var customer = src.getAttribute("customer");
                 console.log(src)
                 var line = document.getElementById(wipid)
-                var input = line.querySelector("input");
+                var input = line.querySelector("input[name='CUSTOMER_ID']");
                 input.value=customer;
                 Change(line,input);
             }
@@ -588,11 +644,12 @@
         {
             var wipid = parentLI(obj).id; // find parent <li>
             var currentjob = document.getElementById(wipid).querySelector("input[name='JOB_ID']").value.trim();
-            var operationlist = customerjob.filter(filterCurrentJob);
-            console.log(operationlist);
+            var currentproduct = customerjob.filter(filterCurrentJob)[0].PRODUCT_ID;
+            var operationlist = productoperation
+            console.log(currentproduct);
             var div=loadingOn("operationlookup");
             div.innerHTML = ["<ul class='menu' onclick='CloseOperationLookup("+wipid+")'>"
-                , operationlist.map(renderOperation).join("")
+                , operationlist.filter((p)=>p.PRODUCT_ID==currentproduct).map(renderOperation).join("")
                 ,"</ul>"].join("");
             document.body.appendChild(div);
             function filterCurrentJob(e)
@@ -603,7 +660,7 @@
             function renderOperation(e)
             {
                 console.log(e)
-                var opdesc = productoperation.filter(o=>o.PRODUCT_ID==e.PRODUCT_ID)[0].OP_DESC;
+                var opdesc = e.OP_DESC;
                 return "<li class='row' OPERATION_ID='" + e.OPERATION_ID + "'>" + e.OPERATION_ID + " - " + opdesc + "</li>";
             }
         }
@@ -615,7 +672,7 @@
                 var operationid = src.getAttribute("OPERATION_ID");
                 console.log(src)
                 var line = document.getElementById(wipid)
-                var input = line.querySelector("input[name='OPERATION_ID']");
+                var input = line.querySelector("input[name='PUNCH_OPERATION']");
                 input.value=operationid;
                 Change(line,input);
             }
@@ -629,6 +686,14 @@
         function convertpunch()
         {
             alert("todo...");
+            fetch(root+"api.asp?perform=convertPunch&userid="+state.user)
+                .then(response=>response.json())
+                .then(json=>refreshdata(json))
+                .catch(err=>console.log(err));
+            function refreshdata(json)
+            {
+                setuserdata(json);
+            }
         }
         function PopComment(obj)
         {

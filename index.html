@@ -77,7 +77,19 @@
             padding:0;
             border:2px solid black;    
         }
-        
+        #commenteditor {
+            position:absolute;
+            width:500px;
+            height:50vh;
+            overflow-y:scroll;
+            top:200px;
+            left:100px;
+            background-color:white;
+            z-index:100;
+            margin:0;
+            padding:20px;
+            border:2px solid black;
+        }
         #actionbox{
             position:absolute;
             width:auto;
@@ -114,12 +126,30 @@
         .col-0 {width:30px;display:inline-block;margin-right:10px;}
         .col-1 {width:100px;display:inline-block;margin-right:10px;}
         .col-2 {width:100px;display:inline-block;margin-right:10px;}
-        .col-3 {width:100px;display:inline-block;margin-right:10px;}
+        .col-3 {width:150px;display:inline-block;margin-right:10px;}
         .col-4 {width:100px;display:inline-block;margin-right:10px;}
         .col-5 {width:100px;display:inline-block;margin-right:10px;}
         .col-6 {width:110px;display:inline-block;margin-right:10px;}
         .col-7 {width:50px;display:inline-block;margin-right:10px;}
         .col-8 {width:100px;display:inline-block;margin-right:10px;}
+        .bigbutton {
+            width:150px;
+            height:70px;
+            background-image:url(./MenuOFF.gif);
+            font-size:24px;
+            text-align:center;
+            padding-top:15px;
+            margin-top:3px;
+            cursor:pointer;
+        }
+        span.plusmoins {
+            display:inline-block;
+            width:20px;
+            background-color:lightgreen;
+            text-align:center;
+            margin-right:5px;
+            cursor:pointer;
+        }
     </style>
     <link rel="stylesheet" href="simplepicker.css" />
     <script>
@@ -167,7 +197,7 @@
                 customerjob = rep[1].map(normalizeCustomer);
                 productoperation = rep[2].map(normalizeProduct);
                 ticketlist = JSON.parse(rep[3].result).issues;
-                console.log("ticketlist",ticketlist);
+                //console.log("ticketlist",ticketlist);
                 start(state,rep[0]);
             }).catch(err=>{
                 document.getElementById("activeuser").innerHTML = "ERROR: " + err.message;
@@ -244,16 +274,23 @@
             if (user=="") 
                 setuserdata([]);
             else
-                fetch(root+"api.asp?perform=getuser&userid="+state.user)
-                    .then(response=>response.json())
-                    .then(json=>setuserdata(json))
-                    .catch(err=>console.log("fetch data error ",err));
+            {
+                Promise.all(
+                    [
+                        fetch(root+"api.asp?perform=getuser&userid="+state.user).then(response=>response.json())
+                        ,fetch(root+"api.asp?perform=getcommentlist&userid="+state.user).then(response=>response.json())
+                    ]
+                ).then(result=>{
+                    setuserdata(result[0],result[1]);
+                }).catch(err=>console.log("fetch data error ",err));
+            }
         }
-        function setuserdata(json)
+        function setuserdata(json,comment)
         {
             if (state.user!="")
             {
                 state.data = json;
+                state.comment = comment;
                 displaydata();
                 if (json.length==0) ActionNew();
             }
@@ -289,7 +326,7 @@
                     ,"<span class='col-5'>"+box(e,"PUNCH_DURATION",4)+"</span>"
                     ,"<span class='col-6'>"+boxJira(e,"TICKET_REF",8)+"</span>"
                     ,"<span class='col-7'>"+boxComment(e,"COMMENT_ID")+"</span>"
-                    ,jiradesc()
+                    ,jiradesc(e)
                     ,"</li>"].join("");
             }
             function basictitle()
@@ -349,7 +386,7 @@
             }
             function checkbox(e,key)
             {
-                var txt=e[key];
+                var txt=e[key]||"";
                 return (
                     "<input type='checkbox' name='" + key + "' " + (txt=="Y"?"checked":"") + " onclick='Activate(parentLI(this))' value='Y'>"
                 );
@@ -357,24 +394,61 @@
             function boxcalendar(e,key,size)
             {
                 var txt=(e[key]||"").substr(0,10);
-                return "<input type='text' name='"+key+"' maxlength=10 value='"+(txt||"")+"' size='"+(size||"10")+"'  ondblclick='PopCalendar(this)' autocomplete='off'>";
+                return ("<span class='plusmoins' onclick='plusmoins(this)'>-</span>"
+                        +"<input type='text' name='"+key+"' maxlength=10 value='"+(txt||"")+"' size='"+(size||"10")+"'  ondblclick='PopCalendar(this)' autocomplete='off'>"
+                        +"<span class='plusmoins' onclick='plusmoins(this)'>+</span>"
+                        );
             }
             function boxJira(e,key,size)
             {
                 var txt=e[key]||"";
                 if (txt.substr(0,3).toUpperCase()=="CS-") txt=txt.substr(3);
-                return ("CS-<input type='text' name='"+key+"' maxlength=4 value='"+(txt||"")+"' size='"+(size||"10")+"'  onchange='LoadJira(this)' ondblclick='PopTicketLookup(this)' autocomplete='off'>"
+                return (
+                    "CS-<input type='text' name='"+key+"' maxlength=4 value='"+(txt||"")+"' size='"+(size||"10")+"' "
+                    +" onchange='LoadJira(this)' ondblclick='PopTicketLookup(this)' autocomplete='off'>"
                 );
             }
-            function jiradesc()
+            function jiradesc(e)
             {
-                return "<span class='JiraText'></span>";
+                var txt = e["COMMENT_ID"];
+                if (txt!=undefined)
+                {
+                    var comment = state.comment.filter(c=>c.COMMENT_ID==txt)[0]||{SHORT_TEXT:""}; 
+                    txt = comment.SHORT_TEXT;
+                }
+                else
+                {
+                    txt = "";
+                }
+                return (
+                    "<span class='JiraText'>" + txt + "</span>"
+                );
 
             }
             function ellipsis(e)
             {
                 return "<img class='imgaction' src='more.png' align=absmiddle onclick='popAction("+e.WIP_ID+")'/>";
             }
+        }
+        Date.prototype.addDays = function(days) {
+            var date = new Date(this.valueOf());
+            date.setDate(date.getDate() + days);
+            return date;
+        }
+        function plusmoins(obj)
+        {
+            var dir = obj.innerText;
+            var line = parentLI(obj);
+            var wipid = line.id;
+            var datebox = line.querySelector("input[name='PUNCH_DATE']");
+            if (datebox.value!="")
+                var d = new Date(datebox.value);
+            else
+                var d = new Date();
+            d = d.addDays(dir=="-"?-1:1);
+            
+            datebox.value = d.toJSON().substr(0,10);
+            Change(line,datebox);
         }
         function popAction(wipid)
         {
@@ -697,7 +771,74 @@
         }
         function PopComment(obj)
         {
-            alert("todo...")
+            
+            var line = parentLI(obj);
+            var wipid = line.id;
+            var comment = line.querySelector("input[name='COMMENT_ID'");
+            if (comment.value!="")
+            {
+                console.log(comment)
+                var buffer = state.comment.filter(c=>c.COMMENT_ID==comment.value);
+                console.log(buffer)
+                var shorttext = buffer[0].SHORT_TEXT||"";
+                var longtext = buffer[0].LONG_TEXT||"";
+            }
+            else
+            {
+                var shorttext = "...";
+                var longtext = "...";
+            }
+            var div = loadingOn("commenteditor");
+            div.innerHTML = [
+                "<input type=text id='SHORT_TEXT' maxlength=50 size=50 value='"+shorttext+"'><br>"
+                ,"<textarea cols='50em' rows=10 id='LONG_TEXT'>"+longtext+"</textarea><br>"
+                ,"<button onclick=\"saveComment("+wipid+",'"+comment.value+"')\">Save</button>"
+                ,"<button onclick='CloseComment()'>Cancel</button>"
+                ].join("");
+            document.body.appendChild(div);
+        }
+        function CloseComment()
+        {
+            loadingOff();
+        }
+        function saveComment(wipid,commentid)
+        {
+            var line=document.getElementById(wipid);
+            console.log("saving",wipid,commentid);
+            if (commentid!="")
+            {
+                var buffer = state.comment.filter(c=>c.COMMENT_ID==commentid);
+                buffer[0].SHORT_TEXT = document.getElementById("SHORT_TEXT").value;
+                buffer[0].LONG_TEXT =  document.getElementById("LONG_TEXT").value;
+                fetch(root+"api.asp?perform=updatecomment&id="+commentid+"&short="+encodeURIComponent(buffer[0].SHORT_TEXT)+"&long="+buffer[0].LONG_TEXT)
+                    .then(response=>response.json())
+                    .then(json=>CloseComment())
+                    .catch(err=>console.log(err));
+            }
+            else
+            {
+                var buffer = [{
+                    SHORT_TEXT:document.getElementById("SHORT_TEXT").value,
+                    LONG_TEXT:document.getElementById("LONG_TEXT").value
+                }];
+                fetch(root+"api.asp?perform=createcomment&userid="+state.user+"&wipd="+wipid+"&short="+encodeURIComponent(buffer[0].SHORT_TEXT)+"&long="+buffer[0].LONG_TEXT)
+                    .then(response=>response.json())
+                    .then(json=>linkcomment(json))
+                    .catch(err=>console.log(err));
+                function linkcomment(json)
+                {
+                    console.log(json);
+                    buffer.COMMENT_ID = json[0].COMMENT_ID;
+                    state.comment.push(buffer);
+
+                    var input = line.querySelector("input[name='COMMENT_ID']");
+                    input.value = json[0].COMMENT_ID;
+                    commentid = input.value;
+                    Change(line,input);
+                    CloseComment();
+                }
+            }
+            line.querySelector("span.JiraText").innerText = buffer[0].SHORT_TEXT;
         }
         function LoadJira(obj)
         {//Access-Control-Allow-Origin
@@ -720,7 +861,53 @@
                 .catch(err=>console.log(err));
             function setJiraText(json)
             {
-                parentLI(obj).querySelector(".JiraText").innerText=unescape(json.jrSummary);
+                console.log("setJiraText",json);
+                var line = parentLI(obj);
+                var sText = "";
+                if (json.RequestStatus==200)
+                {
+                    sText = unescape(json.jrSummary);
+                    comment = line.querySelector("input[name='COMMENT_ID']");
+                    console.log(comment)
+                    var compositeText = json.jrTaskKey + " " + sText;
+                    if (comment.value!="")
+                    {
+                        UpdateShortComment(line.id,comment.value,compositeText);
+                    }
+                    else
+                    {
+                        CreateShortComment(line.id,comment.value,compositeText);
+                        console.log("creating new comment");
+                    }
+                }
+                else
+                {
+                    sText = "";
+                    compositeText = sText;
+                }
+                line.querySelector(".JiraText").innerText = compositeText;
+            }
+        }
+        function UpdateShortComment(wipid,commentid,text)
+        {
+            fetch(root+"api.asp?perform=short&id="+commentid+"&text="+encodeURIComponent(text))
+                .then(response=>response.json())
+                .then(json=>updateComment(wipid,commentid,json[0].SHORT_TEXT))
+                .catch(err=>console.log(err));
+            function updateComment(wipid,commentid,text)
+            {
+                state.comment.filter(c=>c.COMMENT_ID==commentid)[0].SHORT_TEXT= text;
+            }
+        }
+        function CreateShortComment(wipid,commentid,text)
+        {
+            fetch(root+"api.asp?perform=newshort&userid="+state.user+"&wipid="+wipid+"&text="+encodeURIComponent(text))
+                .then(response=>response.json())
+                .then(json=>appendComment(json[0]))
+                .catch(err=>console.log(err));
+            function appendComment(newcomment)
+            {
+                state.comment.push(newcomment);
             }
         }
     </script>
@@ -728,8 +915,7 @@
 <body>
     <h1 class="header"><img src="./Cyframe.gif" width=64 height64 align="absmiddle">Quick Time Entry Sheet
         <span class="toolbar">
-            <button onclick="validateall()">Validate</button>
-            <button onclick="convertpunch()">Convert to Punch</button>
+            <div onclick="convertpunch()" class="bigbutton">Convert to Punch</div>
         </span>
         <div id="activeuser"></div>
     </h1>

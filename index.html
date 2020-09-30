@@ -126,10 +126,10 @@
         .col-0 {width:30px;display:inline-block;margin-right:10px;}
         .col-1 {width:100px;display:inline-block;margin-right:10px;}
         .col-2 {width:100px;display:inline-block;margin-right:10px;}
-        .col-3 {width:150px;display:inline-block;margin-right:10px;}
+        .col-3 {width:160px;display:inline-block;margin-right:10px;}
         .col-4 {width:100px;display:inline-block;margin-right:10px;}
         .col-5 {width:100px;display:inline-block;margin-right:10px;}
-        .col-6 {width:110px;display:inline-block;margin-right:10px;}
+        .col-6 {width:130px;display:inline-block;margin-right:10px;}
         .col-7 {width:50px;display:inline-block;margin-right:10px;}
         .col-8 {width:100px;display:inline-block;margin-right:10px;}
         .bigbutton {
@@ -290,7 +290,8 @@
             if (state.user!="")
             {
                 state.data = json;
-                state.comment = comment;
+                if (comment)
+                    state.comment = comment;
                 displaydata();
                 if (json.length==0) ActionNew();
             }
@@ -304,6 +305,7 @@
         function displaydata()
         {
             var div=document.getElementById("userdata");
+            div.innerHTML = "";
             switch(displaymode)
             {
                 case "BASIC": div.innerHTML=BasicDisplay();
@@ -759,7 +761,6 @@
         }
         function convertpunch()
         {
-            alert("todo...");
             fetch(root+"api.asp?perform=convertPunch&userid="+state.user)
                 .then(response=>response.json())
                 .then(json=>refreshdata(json))

@@ -229,7 +229,7 @@ function BasicDisplay()
     {
         var txt=e[key];
         return ("<input type='hidden' name='" + key + "' value='" + (txt||"") + "'>"
-                + "<img src='ConfirmationMemo.gif' width=16px align=absmiddle onclick='PopComment(this)' style='margin-right:30px;" + (!txt?"opacity:.5":"") + "' />"
+                + "<img class='memo' src='ConfirmationMemo.gif' width=16px align=absmiddle onclick='PopComment(this)' style='margin-right:30px;" + (!txt?"opacity:.5":"") + "' />"
                 );
     }
     function checkbox(e,key)
@@ -381,6 +381,7 @@ function ActionDelete(wipid)
         .then(json=>{
             state.data = state.data.filter((d)=>d.WIP_ID != wipid);
             displaydata();
+            if (state.data.length==0) ActionNew();
         })
         .catch(err=>console.log(err));
 }
@@ -408,6 +409,10 @@ function Change(li,input)
                 break;
         }
     }
+    var temp = state.data.filter(e=>e.WIP_ID==wipid)[0];
+    if (temp) temp[obj.name]=obj.value;
+    console.log(temp,obj.name,obj.value);
+
     fetch(root+"api.asp?perform=updateone&userid="+state.user+"&wipid="+wipid+"&data=" + encodeURIComponent(data))
         .then(response=>response.json())
         .then(json=>console.log("changing",json))
@@ -633,7 +638,7 @@ function PopComment(obj)
     var shorttext = "";
     var longtext = "";
     var buffer;
-    var comment = line.querySelector("input[name='COMMENT_ID'");
+    var comment = line.querySelector("input[name='COMMENT_ID']");
     if (comment.value != "")
     {
         buffer = state.comment.filter(c=>c.COMMENT_ID==comment.value);
@@ -683,6 +688,7 @@ function saveComment(wipid,commentid)
 
             var input = line.querySelector("input[name='COMMENT_ID']");
             input.value = json[0].COMMENT_ID;
+            document.getElementById(wipid).querySelector("img.memo").style.opacity=1;
             commentid = input.value;
             Change(line,input);
             CloseComment();
@@ -719,6 +725,8 @@ function LoadJira(obj)
             comment = line.querySelector("input[name='COMMENT_ID']");
             if (comment.value != "")
             {
+                var temp = state.comment.filter(e=>e.COMMENT_ID==comment.value)[0];
+                temp["SHORT_TEXT"]=compositeText;                
                 UpdateShortComment(line.id,comment.value,compositeText);
             }
             else
@@ -748,6 +756,10 @@ function CreateShortComment(wipid,commentid,text)
         .catch(err=>console.log(err));
     function appendComment(newcomment)
     {
+        var temp = state.data.filter(e=>e.WIP_ID==wipid)[0];
+        temp["COMMENT_ID"]=newcomment.COMMENT_ID;
+        document.getElementById(wipid).querySelector("input[name='COMMENT_ID']").value=newcomment.COMMENT_ID;
+        document.getElementById(wipid).querySelector("img.memo").style.opacity=1;
         state.comment.push(newcomment);
     }
 }

@@ -121,6 +121,7 @@ function selectUser()
     else
     {
         reloadUserData();
+    }
 }
 function reloadUserData()
 {
@@ -132,7 +133,6 @@ function reloadUserData()
         ).then(result=>{
             setuserdata(result[0],result[1]);
         }).catch(err=>console.log("fetch data error ",err));
-    }
 }
 function setuserdata(json,comment)
 {
@@ -337,10 +337,13 @@ function loadingOn(toShield,innerHTML,opt)
 function loadingOff()
 {
     var pop = document.getElementById(shielded);
-    document.body.removeChild(pop);
+    if (pop) document.body.removeChild(pop);
     var div=document.getElementById("shadow");
-    div.onclick = null;
-    document.body.removeChild(div);
+    if (div)
+    {
+        div.onclick = null;
+        document.body.removeChild(div);
+    }
 }
 function DoAction(wipid)
 {
@@ -619,14 +622,22 @@ function validateall()
     var div = document.getElementById("debug");
     div.innerHTML = JSON.stringify(ticketlist,null,2);
 }
-function convertpunch() // TODO: add a Loading Gif
+function convertpunch()
 {
+    loadingOn("loadingscreen",
+        [
+            "<div style='text-align:center'>"
+            ,"<img src='./Loading.gif' width='128px' style='position:absolute;top:50%'>"
+            ,"</div>"
+        ].join("")
+    );
     fetch(root+"api.asp?perform=convertPunch&userid="+state.user)
         .then(response=>response.json())
         .then(json=>refreshdata(json)) // TODO: return a conversion report instead
         .catch(err=>console.log(err));
     function refreshdata(json)
     {
+        loadingOff();
         reloadUserData();
     }
 }

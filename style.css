@@ -105,6 +105,24 @@ menu.li:hover {cursor:pointer}
     margin:0;
     padding:0;
 }
+#loadingscreen {
+    position:absolute;
+    width:auto;
+    height:auto;
+    max-height:80vh;
+    overflow-y:scroll;
+    top:20px;
+    left:10px;
+    width:99vw;
+    height:99vh;
+    background-color:gray;
+    z-index:100;
+    margin:0;
+    padding:0;
+/*    border:2px solid black;    */
+    opacity:.5;
+}
+
 input{border:1px dotted green;background-color:none;}
 input:selected{border:2px solid black}
 li > .imgaction {visibility:hidden}

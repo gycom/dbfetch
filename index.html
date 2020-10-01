@@ -6,6 +6,20 @@
     <title>Quick Time Entry Sheet</title>
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="simplepicker.css" />
+    <style>
+    #releasenote{
+        position:absolute;
+        width:800px;
+        height:300px;
+        overflow-y:scroll;
+        top:200px;
+        left:100px;
+        background-color:white;
+        z-index:100;
+        margin:0;
+        padding:20px;
+        border:2px solid black;}
+    </style>
     <script src="app.js"></script>
 </head>
 <body>
@@ -15,6 +29,9 @@
         </span>
         <div id="activeuser"></div>
     </h1>
+    <img src="./bugfix.jpg" width=16 style='position:absolute;top:0;right:0;cursor:pointer' 
+            title='Show Release Note' 
+            onclick="fetch('./releasenote.txt').then(response=>response.text()).then(text=>loadingOn('releasenote','<h3>Release Notes:</h3><pre><br>'+text+'</pre>'));">
     <div id="userdata"></div>
     <pre id="debug"></pre>
     <script src="./simplepicker.js"></script>

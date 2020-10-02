@@ -658,8 +658,8 @@ function PopComment(obj)
     }
     loadingOn("commenteditor",
                 [
-                    "<input type=text id='SHORT_TEXT' maxlength=50 size=50 value='" + shorttext + "'><br>"
-                    ,"<textarea cols='50em' rows=10 id='LONG_TEXT'>" + longtext + "</textarea><br>"
+                    "<input type=text id='SHORT_TEXT' maxlength=50 size=50 value=\"" + htmlEncode(shorttext) + "\"><br>"
+                    ,"<textarea cols='50em' rows=10 id='LONG_TEXT'>" + htmlEncode(longtext) + "</textarea><br>"
                     ,"<button onclick=\"saveComment(" + wipid + ",'" + comment.value + "')\">Save</button>"
                     ,"<button onclick='CloseComment()'>Cancel</button>"
                 ].join(""));
@@ -773,4 +773,12 @@ function CreateShortComment(wipid,commentid,text)
         document.getElementById(wipid).querySelector("img.memo").style.opacity=1;
         state.comment.push(newcomment);
     }
+}
+function htmlEncode(s) 
+{
+    return s.replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/'/g, '&#39;')
+      .replace(/"/g, '&#34;');
 }

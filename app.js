@@ -5,36 +5,39 @@ var userlist = [];
 var customerjob = [];
 var productoperation = [];
 var ticketlist = [];
-var root;
-var csroot;
-var fake=false;
-if (!fake)
+var root="http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
+var csroot="http://jtcyframe.prod.intranet.cyframe.com/punch/ReviewTimeSheet/";
+function CF_API(url,bText)
 {
-    root="http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
-    csroot="http://jtcyframe.prod.intranet.cyframe.com/punch/ReviewTimeSheet/";
+    const ret = bText?(response)=>response.text():(response)=>response.json();
+    return fetch(root + "api.asp?" + JSONtoRequest(url) + "&v=" + Math.random()).then(ret);
+    function JSONtoRequest(url)
+    {
+        var qs = [];
+        Object.keys(url).forEach(key=>qs.push(key + "=" + encodeURIComponent(url[key]||"")));
+        return qs.join("&");
+    }
 }
-else
-{    
-    root="http://localhost:8100/";
-    csroot=root;
+function JIRA_API(action,body)
+{
+    return fetch(csroot + action,
+    {
+        method:"POST",
+        headers:{
+            "content-type":"application/x-www-form-urlencoded"
+        },
+        body: body
+    }).then(response=>response.json());
 }
-
 function bodyLoad()
 {
-    document.getElementById("activeuser").innerText="... loading data ...";
+    document.getElementById("activeuser").innerText = "... loading data ...";
     Promise.all(
         [
-            fetch(root + "api.asp?perform=version").then(response=>response.text())
-            , fetch(root + "api.asp?perform=refcustomerjob").then(response=>response.json())
-            , fetch(root + "api.asp?perform=refproductoperation").then(response=>response.json())
-            , fetch(csroot+"actJiraList.asp",
-            {
-                method:"POST",
-                headers:{
-                    "content-type":"application/x-www-form-urlencoded"
-                },
-                body: "ACTION=ListTask"
-            }).then(response=>response.json())
+            CF_API({perform:    "version"},true)
+            , CF_API({perform:  "refcustomerjob"})
+            , CF_API({perform:  "refproductoperation"})
+            , JIRA_API("actJiraList.asp","ACTION=ListTask")
         ]
     ).then((rep)=>{
         customerjob = rep[1].map(normalizeCustomer);
@@ -62,8 +65,7 @@ function bodyLoad()
 }
 function start(state,version)
 {
-    fetch(root+"api.asp?perform=userlist")
-        .then(response=>response.json())
+    CF_API({perform: "userlist"})
         .then(json=>builduserlist(trimname(json)))
 }
 function trimname(json)
@@ -90,23 +92,23 @@ function builduserlist(json)
     selectUser();
     function NameAlpha(a,b)
     {
-        var a_name=a.NAME_OF_USER.split(" ")[1];
-        var b_name=b.NAME_OF_USER.split(" ")[1];
-        return a_name>b_name?1:a_name<b_name?-1:0;
+        var a_name = a.NAME_OF_USER.split(" ")[1];
+        var b_name = b.NAME_OF_USER.split(" ")[1];
+        return a_name > b_name ? 1 : a_name < b_name ? -1 : 0;
     }
     function renderuser(e)
     {
         var selected="";
-        if (e.USER_ID==cookieuser) {selected=" selected "; username=e.NAME_OF_USER;};
-        return "<option "+selected+" value='"+e.USER_ID+"'>"+e.NAME_OF_USER+"</option>";
+        if (e.USER_ID == cookieuser) {selected=" selected "; username = e.NAME_OF_USER;};
+        return "<option " + selected + " value='" + e.USER_ID + "'>" + e.NAME_OF_USER + "</option>";
     }
 }
 function unlockUser()
 {
     var opt = document.getElementById("userid");
-    opt.style.display="inline";
+    opt.style.display = "inline";
     var slot = document.getElementById("usernameslot");
-    slot.style.display="none";
+    slot.style.display = "none";
 }
 function selectUser()
 {
@@ -127,8 +129,8 @@ function reloadUserData()
 {
     Promise.all(
             [
-                fetch(root+"api.asp?perform=getuser&userid=" + state.user).then(response=>response.json())
-                ,fetch(root+"api.asp?perform=getcommentlist&userid=" + state.user).then(response=>response.json())
+                CF_API({perform: "getuser", userid: state.user})
+                , CF_API({perform: "getcommentlist", userid: state.user})
             ]
         ).then(result=>{
             setuserdata(result[0],result[1]);
@@ -168,34 +170,35 @@ function BasicDisplay()
     return basictitle() + state.data.map(basicrow).join("");
     function basicrow(e)
     {
-        return ["<li id='"+e.WIP_ID+"' title='"+e.WIP_ID+"' onchange='Change(this)' class='userdatalist'>"
+        return ["<li id='" + e.WIP_ID + "' title='" + e.WIP_ID + "' onchange='Change(this)' class='userdatalist'>"
             , ellipsis(e)
-            , "<span class='col-0'>" + checkbox(e,"CHECKED_YN") + "</span>"
-            , "<span class='col-1'>" + boxCustomer(e,"CUSTOMER_ID",12) + "</span>"
-            , "<span class='col-2'>" + boxJob(e,"JOB_ID",5) + "</span>"
-            , "<span class='col-3'>" + boxcalendar(e,"PUNCH_DATE",10) + "</span>"
-            , "<span class='col-4'>" + boxOperation(e,"PUNCH_OPERATION",4) + "</span>"
-            , "<span class='col-5'>" + box(e,"PUNCH_DURATION",4) + "</span>"
-            , "<span class='col-6'>" + boxJira(e,"TICKET_REF",8) + "</span>"
-            , "<span class='col-7'>" + boxComment(e,"COMMENT_ID") + "</span>"
+            , [ checkbox(e,         "CHECKED_YN")
+                ,  boxCustomer(e,   "CUSTOMER_ID", 12)
+                ,  boxJob(e,        "JOB_ID", 5)
+                ,  boxcalendar(e,   "PUNCH_DATE", 10)
+                ,  boxOperation(e,  "PUNCH_OPERATION", 3)
+                ,  boxDuration(e,   "PUNCH_DURATION", 4)
+                ,  boxJira(e,       "TICKET_REF")
+                ,  boxComment(e,    "COMMENT_ID")
+                ].map((tag,n)=>"<span class='col-" + n + "'>" + tag + "</span>").join("")
             , jiradesc(e)
             , "</li>"].join("");
     }
     function basictitle()
     {
-        return ("<table style='font-weight:bolder;border-collapse: collapse;border-spacing: 0;'>"
-            + "<tr>" 
-            + [ checkAllBox()
+        return ["<table style='font-weight:bolder;border-collapse: collapse;border-spacing: 0;'>"
+            , "<tr>" 
+            , [ checkAllBox()
                 ,"Client"  
                 ,"Job"   
                 ,"Date"   
                 ,"Operation"   
                 ,"Duration"   
                 ,"Ticket Ref"
-                ,"Comments"   ].map(maketitleheader).join("")
-            + "</tr>" 
-            + "</table>"
-        );
+                ,"Comments"].map(maketitleheader).join("")
+            , "</tr>" 
+            , "</table>"
+        ].join("");
         function maketitleheader(hdr,n)
         {
             return "<td class='col-" + n + "'>" + hdr + "</td>";
@@ -205,63 +208,68 @@ function BasicDisplay()
     {
         return "<nobr><span class='imgactionfiller'></span><input type='checkbox' name='CHECK_ALL' onclick='checkAll()'></nobr>";
     }
-    function box(e,key,size)
+    function box(key,value,size,dblclick,onchange)
     {
-        var txt=e[key];
-        return "<input type='text' name='" + key + "' value='" + (txt||"") + "' size='" + (size||"15") + "' autocomplete='off'>";
+        return "<input type='text' "
+                    + " name='" + key + "'"
+                    + " value='" + (value||"") + "'"
+                    + " maxlength='" + (size||"15") + "'"
+                    + " size='" + (size||"15") + "'"
+                    + (key=="PUNCH_DURATION"?" style='text-align:right'":"")
+                    + (key=="PUNCH_DATE"?" placeholder='yyyy-mm-dd'":"")
+                    + (dblclick?" ondblclick='" + dblclick + "(this)'":"")
+                    + (onchange?" onchange='" + onchange + "(this)'":"")
+                    + " autocomplete='off'>";
+    }
+    function boxDuration(e,key,size)
+    {
+        return box(key,e[key],size,"") + "<span style='margin-left:-10px;margin-right:0;'>&nbsp;hrs</span>";
     }
     function boxCustomer(e,key,size)
     {
-        var txt=e[key];
-        return "<input type='text' name='" + key + "' maxlength=12 value='" + (txt||"") + "' size='" + (size||"15") + "' ondblclick='PopCustomerLookup(this)' autocomplete='off'>";
+        return box(key,e[key],size,"PopCustomerLookup");
     }
     function boxJob(e,key,size)
     {
-        var txt=e[key];
-        return "<input type='text' name='" + key + "' maxlength=11 value='" + (txt||"") + "' size='" + (size||"15") + "' ondblclick='PopJobLookup(this)' autocomplete='off'>";
+        return box(key,e[key],size,"PopJobLookup");
     }
     function boxOperation(e,key,size)
     {
-        var txt=e[key];
-        return "<input type='text' name='" + key + "' maxlength=3 value='" + (txt||"") + "' size='" + (size||"15")+"' ondblclick='PopOperationLookup(this)' autocomplete='off'>";
+        return box(key,e[key],size,"PopOperationLookup");
     }
     function boxComment(e,key)
     {
-        var txt=e[key];
+        var txt = e[key];
         return ("<input type='hidden' name='" + key + "' value='" + (txt||"") + "'>"
-                + "<img class='memo' src='ConfirmationMemo.gif' width=16px align=absmiddle onclick='PopComment(this)' style='margin-right:30px;" + (!txt?"opacity:.5":"") + "' />"
+                + "<img class='memo' src='ConfirmationMemo.gif' width='16px' align='absmiddle'"
+                        + " onclick='PopComment(this)' style='margin-right:30px;" + (!txt?"opacity:.5":"") + "' />"
                 );
     }
     function checkbox(e,key)
     {
-        var txt=e[key]||"";
-        return (
-            "<input type='checkbox' name='" + key + "' " + (txt=="Y"?"checked":"") + " value='Y'>"
-        );
+        var txt = e[key]||"";
+        return "<input type='checkbox' name='" + key + "' " + (txt == "Y" ? "checked" : "") + " value='Y'>";
     }
     function boxcalendar(e,key,size)
     {
-        var txt=(e[key]||"").substr(0,10);
+        var txt = (e[key]||"").substr(0,10);
         return ("<span class='plusmoins' onclick='plusmoins(this)'>-</span>"
-                +"<input type='text' name='" + key + "' maxlength=10 value='" + (txt||"") + "' size='" + (size||"10") + "'  ondblclick='PopCalendar(this)' autocomplete='off'>"
-                +"<span class='plusmoins' onclick='plusmoins(this)'>+</span>"
+                + box(key,txt,size,"PopCalendar")
+                + "<span class='plusmoins' onclick='plusmoins(this)'>+</span>"
                 );
     }
-    function boxJira(e,key,size)
+    function boxJira(e,key)
     {
-        var txt=e[key]||"";
-        if (txt.substr(0,3).toUpperCase()=="CS-") txt=txt.substr(3);
-        return (
-            "CS-<input type='text' name='" + key + "' maxlength=4 value='" + (txt||"") + "' size='" + (size||"10") + "' "
-            + " onchange='LoadJira(this)' ondblclick='PopTicketLookup(this)' autocomplete='off'>"
-        );
+        var txt = e[key]||"";
+        if (txt.substr(0,3).toUpperCase() == "CS-") txt = txt.substr(3);
+        return "CS-"+box(key,txt,4,"PopTicketLookup","LoadJira");
     }
     function jiradesc(e)
     {
         var txt = e["COMMENT_ID"];
         if (txt!=undefined)
         {
-            var comment = state.comment.filter(c=>c.COMMENT_ID==txt)[0]||{SHORT_TEXT:""}; 
+            var comment = state.comment.filter(c=>c.COMMENT_ID == txt)[0]||{SHORT_TEXT:""}; 
             txt = comment.SHORT_TEXT;
         }
         else
@@ -359,8 +367,7 @@ function DoAction(wipid)
 }
 function ActionNew()
 {
-    fetch(root+"api.asp?perform=createnew&userid=" + state.user)
-        .then(response=>response.json())
+    CF_API({perform: "createnew", userid: state.user})
         .then(json=>{
             state.data.push(json[0]);
             displaydata();
@@ -369,8 +376,7 @@ function ActionNew()
 }
 function ActionCopy(wipid)
 {
-    fetch(root+"api.asp?perform=duplicateone&userid=" + state.user + "&wipid=" + wipid)
-        .then(response=>response.json())
+    CF_API({perform: "duplicateone", userid: state.user, wipid: wipid})
         .then(json=>{
             state.data.push(json[0]);
             displaydata();
@@ -379,12 +385,11 @@ function ActionCopy(wipid)
 }
 function ActionDelete(wipid)
 {
-    fetch(root+"api.asp?perform=deleteone&userid=" + state.user + "&wipid=" + wipid)
-        .then(response=>response.json())
+    CF_API({perform: "deleteone", userid: state.user, wipid: wipid})
         .then(json=>{
             state.data = state.data.filter((d)=>d.WIP_ID != wipid);
             displaydata();
-            if (state.data.length==0) ActionNew();
+            if (state.data.length == 0) ActionNew();
         })
         .catch(err=>console.log(err));
 }
@@ -396,9 +401,9 @@ function Change(li,input)
     else
         var obj = input;
     var data = "";
-    if (obj.type=="checkbox")
+    if (obj.type == "checkbox")
     {
-        data = obj.name +"='" + (obj.checked ? "Y" : "N") + "'";
+        data = obj.name + "='" + (obj.checked ? "Y" : "N") + "'";
     }
     else
     {
@@ -412,12 +417,11 @@ function Change(li,input)
                 break;
         }
     }
-    var temp = state.data.filter(e=>e.WIP_ID==wipid)[0];
-    if (temp) temp[obj.name]=obj.value;
+    var temp = state.data.filter(e=>e.WIP_ID == wipid)[0];
+    if (temp) temp[obj.name] = obj.value;
     console.log(temp,obj.name,obj.value);
 
-    fetch(root+"api.asp?perform=updateone&userid="+state.user+"&wipid="+wipid+"&data=" + encodeURIComponent(data))
-        .then(response=>response.json())
+    CF_API({perform: "updateone", userid: state.user, wipid: wipid, data: data})
         .then(json=>console.log("changing",json))
         .catch(err=>console.log(err));
 }
@@ -426,16 +430,6 @@ function PopCalendar(obj)
     var date = new Date();
     obj.value = date.getFullYear() + "-" + pad(date.getMonth()+1) + "-" + pad(date.getDate());
     Change(parentLI(obj),obj);
-    return;
-    var simplepicker = new SimplePicker({zIndex:100});
-    simplepicker.open();
-    simplepicker.on("close",(date)=>{
-        
-    });
-    simplepicker.on("submit",(date,readableDate)=>{
-        obj.value = date.getFullYear() + "-" + pad(date.getMonth()+1) + "-" + pad(date.getDate());
-        console.log(obj)
-    })
     function pad(n)
     {
         if (n < 10) return "0" + n;
@@ -537,11 +531,11 @@ function PopJobLookup(obj)
             ].join(""));
     function filterCurrentCustomer(e)
     {
-        return e.CUSTOMER_ID==currentcustomer || currentcustomer=="";
+        return e.CUSTOMER_ID == currentcustomer || currentcustomer == "";
     }
     function renderJob(e)
     {
-        var selection = productoperation.filter(o=>o.PRODUCT_ID==e.PRODUCT_ID);
+        var selection = productoperation.filter(o=>o.PRODUCT_ID == e.PRODUCT_ID);
         if (selection.length == 0) return "";
         var proddesc = selection[0].PRODUCT_DESC;
         return "<li class='row' JOB_ID='" + e.JOB_HEADERS_NUM + "'>" + e.JOB_HEADERS_NUM + " - " + proddesc + "</li>";
@@ -566,9 +560,9 @@ function PopOperationLookup(obj)
     var currentjob = document.getElementById(wipid).querySelector("input[name='JOB_ID']").value.trim();
     var currentproduct = "";
     var operationlist = productoperation;
-    if (currentjob=="") 
+    if (currentjob == "") 
     {
-        operationlist = productoperation.reduce(distinctOperation,[]).sort((a,b)=>a.OP_DESC<b.OP_DESC?-1:a.OP_DESC>b.OP_DESC?1:0);
+        operationlist = productoperation.reduce(distinctOperation,[]).sort((a,b)=>a.OP_DESC < b.OP_DESC ? -1 : a.OP_DESC > b.OP_DESC ? 1 : 0);
     }
     else
     {
@@ -577,21 +571,21 @@ function PopOperationLookup(obj)
     loadingOn("operationlookup",
                 [
                     "<ul class='menu' onclick='CloseOperationLookup("+wipid+")'>"
-                    , operationlist.filter((p)=>p.PRODUCT_ID==currentproduct||currentproduct=="").map(renderOperation).join("")
+                    , operationlist.filter((p)=>p.PRODUCT_ID == currentproduct || currentproduct == "").map(renderOperation).join("")
                     ,"</ul>"
                 ].join(""));
     function distinctOperation(t,e)
     {
         if (t.filter((c)=>c.OPERATION_ID == e.OPERATION_ID).length == 0)
         {
-            t.push({OPERATION_ID:e.OPERATION_ID,OP_DESC:e.OP_DESC})
+            t.push({OPERATION_ID: e.OPERATION_ID, OP_DESC: e.OP_DESC});
         }
         return t;
     }
     function filterCurrentJob(e)
     {
-        var test = e.JOB_HEADERS_NUM==currentjob || currentjob=="";
-        console.log(e.JOB_HEADERS_NUM==currentjob,e.JOB_HEADERS_NUM,currentjob)
+        var test = e.JOB_HEADERS_NUM == currentjob || currentjob == "";
+        console.log(e.JOB_HEADERS_NUM == currentjob, e.JOB_HEADERS_NUM, currentjob);
         return test;
     }
     function renderOperation(e)
@@ -631,8 +625,7 @@ function convertpunch()
             ,"</div>"
         ].join("")
     );
-    fetch(root+"api.asp?perform=convertPunch&userid="+state.user)
-        .then(response=>response.json())
+    CF_API({perform: "convertPunch", userid: state.user})
         .then(json=>refreshdata(json)) // TODO: return a conversion report instead
         .catch(err=>console.log(err));
     function refreshdata(json)
@@ -643,7 +636,6 @@ function convertpunch()
 }
 function PopComment(obj)
 {
-    
     var line = parentLI(obj);
     var wipid = line.id;
     var shorttext = "";
@@ -652,7 +644,7 @@ function PopComment(obj)
     var comment = line.querySelector("input[name='COMMENT_ID']");
     if (comment.value != "")
     {
-        buffer = state.comment.filter(c=>c.COMMENT_ID==comment.value);
+        buffer = state.comment.filter(c=>c.COMMENT_ID == comment.value);
         shorttext = buffer[0].SHORT_TEXT||"";
         longtext = buffer[0].LONG_TEXT||"";
     }
@@ -674,11 +666,10 @@ function saveComment(wipid,commentid)
     var line = document.getElementById(wipid);
     if (commentid != "")
     {
-        buffer = state.comment.filter(c=>c.COMMENT_ID==commentid);
+        buffer = state.comment.filter(c=>c.COMMENT_ID == commentid);
         buffer[0].SHORT_TEXT = document.getElementById("SHORT_TEXT").value;
         buffer[0].LONG_TEXT =  document.getElementById("LONG_TEXT").value;
-        fetch(root+"api.asp?perform=updatecomment&id=" + commentid + "&short=" + encodeURIComponent(buffer[0].SHORT_TEXT) + "&long="+encodeURIComponent(buffer[0].LONG_TEXT))
-            .then(response=>response.json())
+        CF_API({perform: "updatecomment", id: commentid, short: buffer[0].SHORT_TEXT, long: buffer[0].LONG_TEXT})
             .then(json=>CloseComment())
             .catch(err=>console.log(err));
     }
@@ -688,8 +679,7 @@ function saveComment(wipid,commentid)
             SHORT_TEXT: document.getElementById("SHORT_TEXT").value,
             LONG_TEXT:  document.getElementById("LONG_TEXT").value
         }];
-        fetch(root+"api.asp?perform=createcomment&userid=" + state.user + "&wipd=" + wipid + "&short=" + encodeURIComponent(buffer[0].SHORT_TEXT)+"&long=" + encodeURIComponent(buffer[0].LONG_TEXT))
-            .then(response=>response.json())
+        CF_API({perform: "createcomment", userid: state.user, wipd: wipid, short:buffer[0].SHORT_TEXT, long: buffer[0].LONG_TEXT})
             .then(json=>linkcomment(json))
             .catch(err=>console.log(err));
         function linkcomment(json)
@@ -712,16 +702,7 @@ function LoadJira(obj)
     var ROW_DATA = {
         "JiraTaskNum": obj.value
     };
-    fetch(csroot+"actJiraSync.asp",
-            {
-                method:"POST",
-                headers:{
-                    "content-type":"application/x-www-form-urlencoded"
-                },
-                body: "ACTION=pickOneTaskDet&ROW_DATA=" + escape(JSON.stringify(ROW_DATA))
-            }
-        )
-        .then(response=>response.json())
+    JIRA_API("actJiraSync.asp","ACTION=pickOneTaskDet&ROW_DATA=" + escape(JSON.stringify(ROW_DATA)))
         .then(json=>setJiraText(json))
         .catch(err=>console.log(err));
     function setJiraText(json)
@@ -736,8 +717,8 @@ function LoadJira(obj)
             comment = line.querySelector("input[name='COMMENT_ID']");
             if (comment.value != "")
             {
-                var temp = state.comment.filter(e=>e.COMMENT_ID==comment.value)[0];
-                temp["SHORT_TEXT"]=compositeText;                
+                var temp = state.comment.filter(e=>e.COMMENT_ID == comment.value)[0];
+                temp["SHORT_TEXT"] = compositeText;                
                 UpdateShortComment(line.id,comment.value,compositeText);
             }
             else
@@ -750,27 +731,25 @@ function LoadJira(obj)
 }
 function UpdateShortComment(wipid,commentid,text)
 {
-    fetch(root+"api.asp?perform=short&id=" + commentid+"&text=" + encodeURIComponent(text))
-        .then(response=>response.json())
+    CF_API({perform: "short", id: commentid, text: text})
         .then(json=>updateComment(wipid,commentid,json[0].SHORT_TEXT))
         .catch(err=>console.log(err));
     function updateComment(wipid,commentid,text)
     {
-        state.comment.filter(c=>c.COMMENT_ID==commentid)[0].SHORT_TEXT = text;
+        state.comment.filter(c=>c.COMMENT_ID == commentid)[0].SHORT_TEXT = text;
     }
 }
 function CreateShortComment(wipid,commentid,text)
 {
-    fetch(root+"api.asp?perform=newshort&userid=" + state.user + "&wipid=" + wipid + "&text=" + encodeURIComponent(text))
-        .then(response=>response.json())
+    CF_API({perform: "newshort", userid: state.user, wipid: wipid, text: text})
         .then(json=>appendComment(json[0]))
         .catch(err=>console.log(err));
     function appendComment(newcomment)
     {
-        var temp = state.data.filter(e=>e.WIP_ID==wipid)[0];
-        temp["COMMENT_ID"]=newcomment.COMMENT_ID;
-        document.getElementById(wipid).querySelector("input[name='COMMENT_ID']").value=newcomment.COMMENT_ID;
-        document.getElementById(wipid).querySelector("img.memo").style.opacity=1;
+        var temp = state.data.filter(e=>e.WIP_ID == wipid)[0];
+        temp["COMMENT_ID"] = newcomment.COMMENT_ID;
+        document.getElementById(wipid).querySelector("input[name='COMMENT_ID']").value = newcomment.COMMENT_ID;
+        document.getElementById(wipid).querySelector("img.memo").style.opacity = 1;
         state.comment.push(newcomment);
     }
 }

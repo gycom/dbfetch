@@ -173,3 +173,5 @@ span.plusmoins {
     margin-right:5px;
     cursor:pointer;
 }
+
+input::placeholder{color:lightgray;}

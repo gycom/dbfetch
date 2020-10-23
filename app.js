@@ -40,8 +40,8 @@ function bodyLoad()
             , JIRA_API("actJiraList.asp","ACTION=ListTask")
         ]
     ).then((rep)=>{
-        customerjob = rep[1].map(normalizeCustomer);
-        productoperation = rep[2].map(normalizeProduct);
+        if (rep[1]) {customerjob = rep[1].map(normalizeCustomer);} else {document.getElementById("activeuser").innerHTML += "ERROR: rep[1] " + JSON.stringify(rep[1]); customerjob=[];throw(new Error("rep1"));}
+        if (rep[2]) {productoperation = rep[2].map(normalizeProduct);} else  {document.getElementById("activeuser").innerHTML += "ERROR: rep[2] " + JSON.stringify(rep[2]); productoperation=[];throw(new Error("rep2"));}
         ticketlist = JSON.parse(rep[3].result).issues;
         start(state,rep[0]);
     }).catch(err=>{
@@ -253,9 +253,9 @@ function BasicDisplay()
     function boxcalendar(e,key,size)
     {
         var txt = (e[key]||"").substr(0,10);
-        return ("<span class='plusmoins' onclick='plusmoins(this)'>-</span>"
+        return ("<nobr><span class='plusmoins' onclick='plusmoins(this)'>-</span>"
                 + box(key,txt,size,"PopCalendar")
-                + "<span class='plusmoins' onclick='plusmoins(this)'>+</span>"
+                + "<span class='plusmoins' onclick='plusmoins(this)'>+</span></nobr>"
                 );
     }
     function boxJira(e,key)
@@ -442,26 +442,56 @@ function parentLI(obj)
         obj = obj.parentElement;
     return obj;
 }
+const name = (n)=>(n.fields.customfield_10114||{value:"--no customer--"}).value;
+var ticketTitle = false;
+function PopAllTicketLookup(wipid)
+{
+    ticketTitle=false;
+    var div = document.querySelector("#ticketlookup");
+    var filtered = ticketlist;
+    filtered.sort((a,b)=>name(a)<name(b)?-1:name(a)>name(b)?1:0);
+    div.innerHTML = [ 
+        "<div class='JiraPop'>" 
+        , "All Customer..."
+        , "</div>" 
+        , "<ul class='menu' onclick='CloseTicketLookup(" + wipid + ")'>"
+        , filtered.map(renderTicket).join("")
+        , "</ul>"
+    ].join("");
+}
 function PopTicketLookup(obj) // TODO: add a filter on customer (need CyFrame Customer <=> JIRA Client conversion table)
 {
+    ticketTitle=true;
     var wipid = parentLI(obj).id; // find parent <li>
-
+    var filtered = ticketlist;
+    var line = document.getElementById(wipid);
+    var currentCustomer = line.querySelector("input[name='CUSTOMER_ID']").value.trim();
+    var selectedCustomer = customerjob.filter(t=>t.CUSTOMER_ID == currentCustomer)[0];
+    var JiraName = selectedCustomer ? selectedCustomer.JIRA_NAME : "";
+    if (JiraName!="")
+        filtered = filtered.filter(e=>name(e) == JiraName);
     loadingOn("ticketlookup",
-        [
-            "<ul class='menu' onclick='CloseTicketLookup(" + wipid + ")'>"
-            , ticketlist.map(renderTicket).join("")
+        [ 
+            "<div class='JiraPop'>" 
+            , JiraName 
+            , "<button style='display:inline-block;position:absolute;right:0;' onclick='PopAllTicketLookup(\"" + wipid + "\")' >All Customers</button></div>"
+            , "<ul class='menu' onclick='CloseTicketLookup(" + wipid + ")'>"
+            , filtered.map(renderTicket).join("")
             , "</ul>"
         ].join(""));
-    function renderTicket(e)
-    {
-        return ["<li class='row' ticket='" + e.key + "'>"
-                    , "<span class='col'>" 
-                    , e.key 
-                    , "</span>" 
-                    , e.fields.summary 
-                    , "</li>"
-                ].join("");
-    }
+}
+function renderTicket(e,n,a)
+{
+    var currentCustomerName = name(e);
+    var previousCustomerName = n == 0 ? "" : name(a[n-1]);
+    return [ !ticketTitle?(currentCustomerName == previousCustomerName) ? "":"<li class='JiraPop'>" + currentCustomerName + "</li>":""
+                , "<li class='row' ticket='" + e.key + "'>"
+                , "<span class='col'>" 
+                , e.key 
+                , "</span>" 
+                , e.fields.summary 
+                , "</li>"
+            ].join("");
 }
 function CloseTicketLookup(wipid)
 {
@@ -618,16 +648,23 @@ function validateall()
 }
 function convertpunch()
 {
-    loadingOn("loadingscreen",
-        [
-            "<div style='text-align:center'>"
-            ,"<img src='./Loading.gif' width='128px' style='position:absolute;top:50%'>"
-            ,"</div>"
-        ].join("")
-    );
-    CF_API({perform: "convertPunch", userid: state.user})
-        .then(json=>refreshdata(json)) // TODO: return a conversion report instead
-        .catch(err=>console.log(err));
+    if (state.user)
+    {
+        loadingOn("loadingscreen",
+            [
+                "<div style='text-align:center'>"
+                ,"<img src='./Loading.gif' width='128px' style='position:absolute;top:50%'>"
+                ,"</div>"
+            ].join("")
+        );
+        CF_API({perform: "convertPunch", userid: state.user})
+            .then(json=>refreshdata(json)) // TODO: return a conversion report instead
+            .catch(err=>console.log(err));
+    }
+    else
+    {
+        alert("Select a user first");
+    }
     function refreshdata(json)
     {
         loadingOff();

@@ -128,7 +128,8 @@ input:selected{border:2px solid black}
 li > .imgaction {visibility:hidden}
 li:hover > .imgaction {visibility:visible}
 ul >li.row {list-style-type:none;}
-li.row {cursor:pointer}
+ul {padding:0;margin:0}
+li.row {cursor:pointer;}
 span.col {width:100px;display:inline-block;}
 #activeuser {display:block;}
 .toolbar {float:right;margin-right:50px}
@@ -175,3 +176,10 @@ span.plusmoins {
 }
 
 input::placeholder{color:lightgray;}
+
+.JiraPop {
+    padding:5px;
+    background-color:black;
+    color:white;
+    border:1px black solid;
+}

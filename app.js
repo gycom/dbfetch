@@ -1,12 +1,19 @@
 window.onload=window.setTimeout(bodyLoad,1000);
-var displaymode = "BASIC";
+var displaymode = window.localStorage.getItem("mode")||"EXPAND";
 var state = {user:undefined};
 var userlist = [];
 var customerjob = [];
 var productoperation = [];
 var ticketlist = [];
-var root="http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
-var csroot="http://jtcyframe.prod.intranet.cyframe.com/punch/ReviewTimeSheet/";
+var root = "http://jobtrack.dev.intranet.cyframe.com/CMACEntral/developertools/rssfeed/tools/timesheetroot/";
+var csroot = "http://jtcyframe.prod.intranet.cyframe.com/punch/ReviewTimeSheet/";
+
+Date.prototype.addDays = function(days) {
+    var date = new Date(this.valueOf());
+    date.setDate(date.getDate() + days);
+    return date;
+}
+
 function CF_API(url,bText)
 {
     const ret = bText?(response)=>response.text():(response)=>response.json();
@@ -40,9 +47,9 @@ function bodyLoad()
             , JIRA_API("actJiraList.asp","ACTION=ListTask")
         ]
     ).then((rep)=>{
-        if (rep[1]) {customerjob = rep[1].map(normalizeCustomer);} else {document.getElementById("activeuser").innerHTML += "ERROR: rep[1] " + JSON.stringify(rep[1]); customerjob=[];throw(new Error("rep1"));}
-        if (rep[2]) {productoperation = rep[2].map(normalizeProduct);} else  {document.getElementById("activeuser").innerHTML += "ERROR: rep[2] " + JSON.stringify(rep[2]); productoperation=[];throw(new Error("rep2"));}
-        ticketlist = JSON.parse(rep[3].result).issues;
+        customerjob         = safeArray("rep[1]",rep[1],normalizeCustomer);
+        productoperation    = safeArray("rep[2]",rep[2],normalizeProduct);
+        ticketlist          = safeArray("rep[3]",JSON.parse(rep[3].result).issues,normalizeTicket);
         start(state,rep[0]);
     }).catch(err=>{
         document.getElementById("activeuser").innerHTML = "ERROR: " + err.message;
@@ -61,6 +68,30 @@ function bodyLoad()
         var x=e;
         x.PRODUCT_ID = x.PRODUCT_ID.trim();
         return x;
+    }
+    function normalizeTicket(e)
+    {
+        return {
+            key: e.key,
+            fields: {
+                summary: e.fields.summary,
+                customfield_10114: { // customer name
+                    value: name(e)
+                }
+            }
+        };
+    }
+    function safeArray(title,arr,normalize)
+    {
+        if (arr)
+        {
+            return arr.map(normalize);
+        }
+        else
+        {
+            document.getElementById("activeuser").innerHTML = "ERROR: " + title + " " + JSON.stringify(arr);
+            return [];
+        }
     }
 }
 function start(state,version)
@@ -81,7 +112,7 @@ function trimname(json)
 function builduserlist(json)
 {
     var username="";
-    var cookieuser=window.localStorage.getItem("user");
+    var cookieuser = window.localStorage.getItem("user");
     var div=document.getElementById("activeuser");
     div.innerHTML = ("<select style='display:none' id='userid' onchange='selectUser()'>"
                         + "<option value=''>--choose user--</option>" 
@@ -128,13 +159,13 @@ function selectUser()
 function reloadUserData()
 {
     Promise.all(
-            [
-                CF_API({perform: "getuser", userid: state.user})
-                , CF_API({perform: "getcommentlist", userid: state.user})
-            ]
-        ).then(result=>{
-            setuserdata(result[0],result[1]);
-        }).catch(err=>console.log("fetch data error ",err));
+                [
+                    CF_API({perform: "getuser", userid: state.user})
+                    , CF_API({perform: "getcommentlist", userid: state.user})
+                ]
+            ).then(result=>{
+                setuserdata(result[0],result[1]);
+            }).catch(err=>console.log("fetch data error ",err));
 }
 function setuserdata(json,comment)
 {
@@ -142,7 +173,7 @@ function setuserdata(json,comment)
     {
         state.data = json;
         if (comment)
-            state.comment = comment;
+        state.comment = comment;
         displaydata();
         if (json.length == 0) ActionNew();
     }
@@ -152,27 +183,32 @@ function setuserdata(json,comment)
         state.comment = [];
         displaydata();
     }
-
+    
 }
 function displaydata()
 {
-    var div=document.getElementById("userdata");
+    var div = document.getElementById("userdata");
     div.innerHTML = "";
+    console.log(displaymode)
     switch(displaymode)
     {
         case "BASIC": div.innerHTML = BasicDisplay(); break;
-        default: displaymode="BASIC"; BasicDisplay(); break;
+        default: displaymode="EXPAND"; div.innerHTML = ExpandDisplay(); break;
     }
+    document.getElementById("userdata").className = displaymode;
+    document.getElementById("mode").value = displaymode;
 }
+
 function BasicDisplay()
 {
-    console.log(state.data);
     return basictitle() + state.data.map(basicrow).join("");
     function basicrow(e)
     {
-        return ["<li id='" + e.WIP_ID + "' title='" + e.WIP_ID + "' onchange='Change(this)' class='userdatalist'>"
+        return [
+            "<li id='" + e.WIP_ID + "' title='" + e.WIP_ID + "' onchange='Change(this)' class='userdatalist' >"
             , ellipsis(e)
-            , [ checkbox(e,         "CHECKED_YN")
+            , [ 
+                checkbox(e,         "CHECKED_YN")
                 ,  boxCustomer(e,   "CUSTOMER_ID", 12)
                 ,  boxJob(e,        "JOB_ID", 5)
                 ,  boxcalendar(e,   "PUNCH_DATE", 10)
@@ -182,13 +218,15 @@ function BasicDisplay()
                 ,  boxComment(e,    "COMMENT_ID")
                 ].map((tag,n)=>"<span class='col-" + n + "'>" + tag + "</span>").join("")
             , jiradesc(e)
-            , "</li>"].join("");
+            , "</li>"
+        ].join("");
     }
     function basictitle()
     {
         return ["<table style='font-weight:bolder;border-collapse: collapse;border-spacing: 0;'>"
             , "<tr>" 
-            , [ checkAllBox()
+            , [ 
+                checkAllBox()
                 ,"Client"  
                 ,"Job"   
                 ,"Date"   
@@ -201,95 +239,179 @@ function BasicDisplay()
         ].join("");
         function maketitleheader(hdr,n)
         {
-            return "<td class='col-" + n + "'>" + hdr + "</td>";
+            return "<td valign=top class='col-" + n + "'>" + hdr + "</td>";
         }
-    }
-    function checkAllBox()
-    {
-        return "<nobr><span class='imgactionfiller'></span><input type='checkbox' name='CHECK_ALL' onclick='checkAll()'></nobr>";
-    }
-    function box(key,value,size,dblclick,onchange)
-    {
-        return "<input type='text' "
-                    + " name='" + key + "'"
-                    + " value='" + (value||"") + "'"
-                    + " maxlength='" + (size||"15") + "'"
-                    + " size='" + (size||"15") + "'"
-                    + (key=="PUNCH_DURATION"?" style='text-align:right'":"")
-                    + (key=="PUNCH_DATE"?" placeholder='yyyy-mm-dd'":"")
-                    + (dblclick?" ondblclick='" + dblclick + "(this)'":"")
-                    + (onchange?" onchange='" + onchange + "(this)'":"")
-                    + " autocomplete='off'>";
-    }
-    function boxDuration(e,key,size)
-    {
-        return box(key,e[key],size,"") + "<span style='margin-left:-10px;margin-right:0;'>&nbsp;hrs</span>";
-    }
-    function boxCustomer(e,key,size)
-    {
-        return box(key,e[key],size,"PopCustomerLookup");
-    }
-    function boxJob(e,key,size)
-    {
-        return box(key,e[key],size,"PopJobLookup");
-    }
-    function boxOperation(e,key,size)
-    {
-        return box(key,e[key],size,"PopOperationLookup");
-    }
-    function boxComment(e,key)
-    {
-        var txt = e[key];
-        return ("<input type='hidden' name='" + key + "' value='" + (txt||"") + "'>"
-                + "<img class='memo' src='ConfirmationMemo.gif' width='16px' align='absmiddle'"
-                        + " onclick='PopComment(this)' style='margin-right:30px;" + (!txt?"opacity:.5":"") + "' />"
-                );
-    }
-    function checkbox(e,key)
-    {
-        var txt = e[key]||"";
-        return "<input type='checkbox' name='" + key + "' " + (txt == "Y" ? "checked" : "") + " value='Y'>";
-    }
-    function boxcalendar(e,key,size)
-    {
-        var txt = (e[key]||"").substr(0,10);
-        return ("<nobr><span class='plusmoins' onclick='plusmoins(this)'>-</span>"
-                + box(key,txt,size,"PopCalendar")
-                + "<span class='plusmoins' onclick='plusmoins(this)'>+</span></nobr>"
-                );
-    }
-    function boxJira(e,key)
-    {
-        var txt = e[key]||"";
-        if (txt.substr(0,3).toUpperCase() == "CS-") txt = txt.substr(3);
-        return "CS-"+box(key,txt,4,"PopTicketLookup","LoadJira");
-    }
-    function jiradesc(e)
-    {
-        var txt = e["COMMENT_ID"];
-        if (txt!=undefined)
-        {
-            var comment = state.comment.filter(c=>c.COMMENT_ID == txt)[0]||{SHORT_TEXT:""}; 
-            txt = comment.SHORT_TEXT;
-        }
-        else
-        {
-            txt = "";
-        }
-        return (
-            "<span class='JiraText'>" + txt + "</span>"
-        );
-
-    }
-    function ellipsis(e)
-    {
-        return "<img class='imgaction' src='more.png' align=absmiddle onclick='popAction(" + e.WIP_ID + ")'/>";
     }
 }
-Date.prototype.addDays = function(days) {
-    var date = new Date(this.valueOf());
-    date.setDate(date.getDate() + days);
-    return date;
+
+function ExpandDisplay()
+{
+    return expandtitle() + state.data.map(expandrow).join("");
+    function expandrow(e)
+    {
+        return [
+            "<li id='" + e.WIP_ID + "' title='" + e.WIP_ID + "' onchange='Change(this)' class='userdatalist'>"
+            , ellipsis(e)
+            , [ 
+                checkbox(e,         "CHECKED_YN")
+                ,  boxCustomer(e,   "CUSTOMER_ID", 12)
+                ,  boxJob(e,        "JOB_ID", 5)
+                ,  boxcalendar(e,   "PUNCH_DATE", 10)
+                ,  boxOperation(e,  "PUNCH_OPERATION", 3)
+                ,  boxDuration(e,   "PUNCH_DURATION", 4)
+                ,  boxJira(e,       "TICKET_REF")
+                ,  boxExpandComment1(e,    "COMMENT_ID")
+                ,  boxExpandComment2(e,    "COMMENT_ID")
+                ].map((tag,n)=>"<span class='col-" + n + "'>" + tag + "</span>").join("")
+            , expandjiradesc(e)
+            , "</li>"
+        ].join("");
+    }
+    function expandtitle()
+    {
+        return [
+            "<table style='font-weight:bolder;border-collapse: collapse;border-spacing: 0;'>"
+            , "<tr>" 
+            , [ 
+                checkAllBox()
+                ,"Client"
+                ,"Job"
+                ,"Date"
+                ,"Operation"
+                ,"Duration"
+                ,"Ticket Ref"
+                ,"Internal Comment"
+                ,"Comment for Customer"
+            ].map(maketitleheader).join("")
+            , "</tr>"
+            , "</table>"
+        ].join("");
+        function maketitleheader(hdr,n)
+        {
+            return "<td valign=top class='col-" + n + "'>" + hdr + "</td>";
+        }
+    }
+}
+
+
+function checkAllBox()
+{
+    return "<nobr><span class='imgactionfiller'></span><input type='checkbox' name='CHECK_ALL' onclick='checkAll()'></nobr>";
+}
+function box(key,value,size,dblclick,onchange)
+{
+    return [
+            "<input type='text' "
+            , " name='" + key + "'"
+            , " value='" + (value||"") + "'"
+            , " maxlength='" + (size||"15") + "'"
+            , " size='" + (size||"15") + "'"
+            , (key == "PUNCH_DURATION"?" style='text-align:right'" : "")
+            , (key == "PUNCH_DATE"?" placeholder='yyyy-mm-dd'" : "")
+            , (dblclick ? " ondblclick='" + dblclick + "(this)'" : "")
+            , (onchange ? " onchange='" + onchange + "(this)'" : "")
+            , " autocomplete='off'>"
+            ].join("");
+}
+function boxDuration(e,key,size)
+{
+    return box(key,e[key],size,"") + "<span style='margin-left:-10px;margin-right:0;'>&nbsp;hrs</span>";
+}
+function boxCustomer(e,key,size)
+{
+    return box(key,e[key],size,"PopCustomerLookup");
+}
+function boxJob(e,key,size)
+{
+    return box(key,e[key],size,"PopJobLookup");
+}
+function boxOperation(e,key,size)
+{
+    return box(key,e[key],size,"PopOperationLookup");
+}
+function boxComment(e,key)
+{
+    var txt = e[key];
+    return ("<input type='hidden' name='" + key + "' value='" + (txt||"") + "'>"
+            + "<img class='memo' src='ConfirmationMemo.gif' width='16px' align='absmiddle'"
+                    + " onclick='PopComment(this)' style='margin-right:30px;" + (!txt?"opacity:.5":"") + "' />"
+            );
+}
+function boxExpandComment1(e,key)
+{
+    var id = e[key];
+    var txt = "";
+    if (e["COMMENT_ID"]) txt = (state.comment.filter(c=>c.COMMENT_ID == e["COMMENT_ID"])[0]||{SHORT_TEXT:""}).SHORT_TEXT||"";
+    return [
+            "<input type='hidden' name='" + key + "' value='" + (id||"") + "'>"
+            , "<input type='text' name='SHORT_TEXT' size='50' maxlength='50' value=\"" + txt + "\" />"
+        ].join("");
+}
+function boxExpandComment2(e,key)
+{
+    var id = e[key];
+    var txt = "";
+    if (e["COMMENT_ID"]) txt = (state.comment.filter(c=>c.COMMENT_ID == e["COMMENT_ID"])[0]||{LONG_TEXT:""}).LONG_TEXT||"";
+    return [
+            "<textarea name='LONG_TEXT' cols=40 rows=2>" + txt + "</textarea>"
+        ].join("");
+}
+function checkbox(e,key)
+{
+    var txt = e[key]||"";
+    return "<input type='checkbox' name='" + key + "' " + (txt == "Y" ? "checked" : "") + " value='Y'>";
+}
+function boxcalendar(e,key,size)
+{
+    var txt = (e[key]||"").substr(0,10);
+    return ("<nobr><span class='plusmoins' onclick='plusmoins(this)'>-</span>"
+            + box(key,txt,size,"PopCalendar")
+            + "<span class='plusmoins' onclick='plusmoins(this)'>+</span></nobr>"
+            );
+}
+function boxJira(e,key)
+{
+    var txt = e[key]||"";
+    if (txt.substr(0,3).toUpperCase() == "CS-") txt = txt.substr(3);
+    return "CS-"+box(key,txt,4,"PopTicketLookup","LoadJira");
+}
+function jiradesc(e)
+{
+    var txt = e["COMMENT_ID"];
+    if (txt!=undefined)
+    {
+        var comment = state.comment.filter(c=>c.COMMENT_ID == txt)[0]||{SHORT_TEXT:""}; 
+        txt = comment.SHORT_TEXT||"";
+    }
+    else
+    {
+        txt = "";
+    }
+    return (
+        "<span class='JiraText'>" + txt + "</span>"
+    );
+
+}
+function expandjiradesc(e)
+{
+    var txt = e["COMMENT_ID"];
+    if (txt!=undefined)
+    {
+        var comment = state.comment.filter(c=>c.COMMENT_ID == txt)[0]||{SHORT_TEXT:""}; 
+        txt = comment.SHORT_TEXT;
+    }
+    else
+    {
+        txt = "";
+    }
+    return (
+        "<span class='JiraText' style='display:none'>" + txt + "</span>"
+    );
+
+}
+function ellipsis(e)
+{
+    return "<img class='imgaction' src='more.png' align=absmiddle onclick='popAction(" + e.WIP_ID + ")'/>";
 }
 function plusmoins(obj)
 {
@@ -401,6 +523,14 @@ function Change(li,input)
     else
         var obj = input;
     var data = "";
+    var datamode = "updatefield";
+    var shorttext = "";
+    var longtext = "";
+    var commentid = document.getElementById(wipid).querySelector("input[name='COMMENT_ID']").value;
+    if (commentid!="")
+        var param = {perform:"updatecomment",id:commentid};
+    else
+        var param = {perform:"createcomment",user:state.user,id:commentid,wipid:wipid};
     if (obj.type == "checkbox")
     {
         data = obj.name + "='" + (obj.checked ? "Y" : "N") + "'";
@@ -412,18 +542,52 @@ function Change(li,input)
             case "PUNCH_DATE": 
                 data = obj.name + "=TO_DATE('" + obj.value + "','YYYY-MM-DD')"; 
                 break;
+            case "SHORT_TEXT":
+                datamode = "short";
+                //shorttext = obj.value;
+                param["short"] = obj.value;
+                break;
+            case "LONG_TEXT":
+                datamode = "long";
+                //longtext = obj.value;
+                param["long"] = obj.value;
+                break;
             default:
                 data = obj.name + "='" + obj.value + "'";
                 break;
         }
     }
+    console.log("change ",data)
     var temp = state.data.filter(e=>e.WIP_ID == wipid)[0];
     if (temp) temp[obj.name] = obj.value;
     console.log(temp,obj.name,obj.value);
 
-    CF_API({perform: "updateone", userid: state.user, wipid: wipid, data: data})
-        .then(json=>console.log("changing",json))
-        .catch(err=>console.log(err));
+    switch(datamode)
+    {
+        case "short":
+        case "long":
+                CF_API(param)
+                .then(json=>{
+                    if(commentid == "")
+                    {
+                        state.comment.push({COMMENT_ID:json[0].COMMENT_ID,SHORT_TEXT:json[0].SHORT_TEXT,LONG_TEXT:json[0].LONG_TEXT});
+                        var line = document.getElementById(wipid);
+                        var input = line.querySelector("input[name='COMMENT_ID']");
+                        input.value = json[0].COMMENT_ID;
+                    }
+                    else
+                    {
+                        console.log(datamode,json)
+                    }
+                })
+                .catch(err=>console.log(err));
+            break;
+        default:
+            CF_API({perform: "updateone", userid: state.user, wipid: wipid, data: data})
+                .then(json=>console.log("changing",json))
+                .catch(err=>console.log(err));
+            break;
+    }
 }
 function PopCalendar(obj)
 {
@@ -641,11 +805,6 @@ function CloseOperationLookup(wipid)
     }
     loadingOff();
 }
-function validateall()
-{
-    var div = document.getElementById("debug");
-    div.innerHTML = JSON.stringify(ticketlist,null,2);
-}
 function convertpunch()
 {
     if (state.user)
@@ -732,7 +891,7 @@ function saveComment(wipid,commentid)
             CloseComment();
         }
     }
-    line.querySelector("span.JiraText").innerText = buffer[0].SHORT_TEXT;
+    line.querySelector("span.JiraText").innerText = buffer[0].SHORT_TEXT||"";
 }
 function LoadJira(obj)
 {
@@ -764,6 +923,7 @@ function LoadJira(obj)
             }
         }
         line.querySelector(".JiraText").innerText = compositeText;
+        echoBackShortComment(line.id,compositeText);
     }
 }
 function UpdateShortComment(wipid,commentid,text)
@@ -774,6 +934,7 @@ function UpdateShortComment(wipid,commentid,text)
     function updateComment(wipid,commentid,text)
     {
         state.comment.filter(c=>c.COMMENT_ID == commentid)[0].SHORT_TEXT = text;
+        echoBackShortComment(wipid,text);
     }
 }
 function CreateShortComment(wipid,commentid,text)
@@ -785,10 +946,21 @@ function CreateShortComment(wipid,commentid,text)
     {
         var temp = state.data.filter(e=>e.WIP_ID == wipid)[0];
         temp["COMMENT_ID"] = newcomment.COMMENT_ID;
-        document.getElementById(wipid).querySelector("input[name='COMMENT_ID']").value = newcomment.COMMENT_ID;
-        document.getElementById(wipid).querySelector("img.memo").style.opacity = 1;
+        var line = document.getElementById(wipid);
+        line.querySelector("input[name='COMMENT_ID']").value = newcomment.COMMENT_ID;
+        echoBackShortComment(wipid,newcomment.SHORT_TEXT);
+        echoBackLongComment(wipid,newcomment.LONG_TEXT);
+        line.querySelector("img.memo").style.opacity = 1;
         state.comment.push(newcomment);
     }
+}
+function echoBackShortComment(wipid,text){
+    var line = document.getElementById(wipid);
+    line.querySelector("input[name='SHORT_TEXT']").value = text||"";
+}
+function echoBackLongComment(wipid,text){
+    var line = document.getElementById(wipid);
+    line.querySelector("input[name='LONG_TEXT']").value = text||"";
 }
 function htmlEncode(s) 
 {
@@ -797,4 +969,11 @@ function htmlEncode(s)
       .replace(/>/g, '&gt;')
       .replace(/'/g, '&#39;')
       .replace(/"/g, '&#34;');
+}
+
+function changeDisplayMode()
+{
+    displaymode=document.getElementById("mode").value;
+    window.localStorage.setItem("mode",displaymode);
+    reloadUserData();
 }

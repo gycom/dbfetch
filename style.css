@@ -135,26 +135,34 @@ span.col {width:100px;display:inline-block;}
 .toolbar {float:right;margin-right:50px}
 .JiraText {width:25em;overflow-x:hidden;text-overflow:ellipsis;white-space: nowrap;display:inline-block;}
 
+textarea {height:1em;vertical-align:middle}
+textarea:focus {height:4em;}
 span.col-0 {width:15px;display:inline-block;margin-right:15px;}
 span.col-1 {width:100px;display:inline-block;margin-right:10px;}
 span.col-2 {width:100px;display:inline-block;margin-right:10px;}
 span.col-3 {width:160px;display:inline-block;margin-right:10px;}
-span.col-4 {width:100px;display:inline-block;margin-right:10px;}
-span.col-5 {width:100px;display:inline-block;margin-right:10px;}
-span.col-6 {width:130px;display:inline-block;margin-right:10px;}
-span.col-7 {width:50px;display:inline-block;margin-right:10px;}
-span.col-8 {width:100px;display:inline-block;margin-right:10px;}
+span.col-4 {width:80px;display:inline-block;margin-right:10px;}
+span.col-5 {width:80px;display:inline-block;margin-right:10px;}
+span.col-6 {width:80px;display:inline-block;margin-right:10px;}
+.EXPAND span.col-7 {width:355px;display:inline-block;margin-right:10px;}
+.EXPAND span.col-8 {width:300px;display:inline-block;margin-right:10px;}
+
+.BASIC span.col-7 {width:60;display:inline-block;margin-right:10px;}
+.BASIC span.col-8 {width:300px;display:inline-block;margin-right:10px;}
 
 td {padding-right:8px;}
 td.col-0 {width:15px;}
 td.col-1 {width:100px;}
 td.col-2 {width:100px;}
 td.col-3 {width:160px;}
-td.col-4 {width:100px;}
-td.col-5 {width:100px;}
-td.col-6 {width:130px;}
-td.col-7 {width:50px;}
-td.col-8 {width:100px;}
+td.col-4 {width:80px;}
+td.col-5 {width:80px;}
+td.col-6 {width:80px;}
+.EXPAND td.col-7 {width:355px;}
+.EXPAND td.col-8 {width:300px;}
+
+.BASIC td.col-7 {width:60px;}
+.BASIC td.col-8 {width:300px;}
 
 .bigbutton {
     width:150px;

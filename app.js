@@ -165,7 +165,7 @@ function reloadUserData()
                 ]
             ).then(result=>{
                 setuserdata(result[0],result[1]);
-            }).catch(err=>console.log("fetch data error ",err));
+            }).catch(err=>PopError(err));
 }
 function setuserdata(json,comment)
 {
@@ -189,7 +189,6 @@ function displaydata()
 {
     var div = document.getElementById("userdata");
     div.innerHTML = "";
-    console.log(displaymode)
     switch(displaymode)
     {
         case "BASIC": div.innerHTML = BasicDisplay(); break;
@@ -343,7 +342,7 @@ function boxExpandComment1(e,key)
     var txt = "";
     if (e["COMMENT_ID"]) txt = (state.comment.filter(c=>c.COMMENT_ID == e["COMMENT_ID"])[0]||{SHORT_TEXT:""}).SHORT_TEXT||"";
     return [
-            "<input type='hidden' name='" + key + "' value='" + (id||"") + "'>"
+            "<input type='hidden' name='" + key + "' value='" + (id||"") + "'><img class='memo' style='display:none;' />"
             , "<input type='text' name='SHORT_TEXT' size='50' maxlength='50' value=\"" + txt + "\" />"
         ].join("");
 }
@@ -496,7 +495,7 @@ function ActionNew()
             var lines = document.querySelectorAll("li");
             lines[lines.length-1].querySelector("input[name='CUSTOMER_ID']").focus();
         })
-        .catch(err=>console.log(err));
+        .catch(err=>PopError(err));
 }
 function ActionCopy(wipid)
 {
@@ -505,7 +504,7 @@ function ActionCopy(wipid)
             state.data.push(json[0]);
             displaydata();
         })
-        .catch(err=>console.log(err));
+        .catch(err=>PopError(err));
 }
 function ActionDelete(wipid)
 {
@@ -515,7 +514,7 @@ function ActionDelete(wipid)
             displaydata();
             if (state.data.length == 0) ActionNew();
         })
-        .catch(err=>console.log(err));
+        .catch(err=>PopError(err));
 }
 function Change(li,input)
 {
@@ -562,7 +561,6 @@ function Change(li,input)
     console.log("change ",data)
     var temp = state.data.filter(e=>e.WIP_ID == wipid)[0];
     if (temp) temp[obj.name] = obj.value;
-    console.log(temp,obj.name,obj.value);
 
     switch(datamode)
     {
@@ -582,12 +580,12 @@ function Change(li,input)
                         console.log(datamode,json)
                     }
                 })
-                .catch(err=>console.log(err));
+                .catch(err=>PopError(err));
             break;
         default:
             CF_API({perform: "updateone", userid: state.user, wipid: wipid, data: data})
                 .then(json=>console.log("changing",json))
-                .catch(err=>console.log(err));
+                .catch(err=>PopError(err));
             break;
     }
 }
@@ -781,7 +779,6 @@ function PopOperationLookup(obj)
     function filterCurrentJob(e)
     {
         var test = e.JOB_HEADERS_NUM == currentjob || currentjob == "";
-        console.log(e.JOB_HEADERS_NUM == currentjob, e.JOB_HEADERS_NUM, currentjob);
         return test;
     }
     function renderOperation(e)
@@ -820,7 +817,7 @@ function convertpunch()
         );
         CF_API({perform: "convertPunch", userid: state.user})
             .then(json=>refreshdata(json)) // TODO: return a conversion report instead
-            .catch(err=>console.log(err));
+            .catch(err=>PopError(err));
     }
     else
     {
@@ -869,7 +866,7 @@ function saveComment(wipid,commentid)
         buffer[0].LONG_TEXT =  document.getElementById("LONG_TEXT").value;
         CF_API({perform: "updatecomment", id: commentid, short: buffer[0].SHORT_TEXT, long: buffer[0].LONG_TEXT})
             .then(json=>CloseComment())
-            .catch(err=>console.log(err));
+            .catch(err=>PopError(err));
     }
     else
     {
@@ -879,7 +876,7 @@ function saveComment(wipid,commentid)
         }];
         CF_API({perform: "createcomment", userid: state.user, wipd: wipid, short:buffer[0].SHORT_TEXT, long: buffer[0].LONG_TEXT})
             .then(json=>linkcomment(json))
-            .catch(err=>console.log(err));
+            .catch(err=>PopError(err));
         function linkcomment(json)
         {
             buffer[0].COMMENT_ID = json[0].COMMENT_ID;
@@ -902,7 +899,7 @@ function LoadJira(obj)
     };
     JIRA_API("actJiraSync.asp","ACTION=pickOneTaskDet&ROW_DATA=" + escape(JSON.stringify(ROW_DATA)))
         .then(json=>setJiraText(json))
-        .catch(err=>console.log(err));
+        .catch(err=>PopError(err));
     function setJiraText(json)
     {
         var line = parentLI(obj);
@@ -932,7 +929,7 @@ function UpdateShortComment(wipid,commentid,text)
 {
     CF_API({perform: "short", id: commentid, text: text})
         .then(json=>updateComment(wipid,commentid,json[0].SHORT_TEXT))
-        .catch(err=>console.log(err));
+        .catch(err=>PopError(err));
     function updateComment(wipid,commentid,text)
     {
         state.comment.filter(c=>c.COMMENT_ID == commentid)[0].SHORT_TEXT = text;
@@ -943,7 +940,7 @@ function CreateShortComment(wipid,commentid,text)
 {
     CF_API({perform: "newshort", userid: state.user, wipid: wipid, text: text})
         .then(json=>appendComment(json[0]))
-        .catch(err=>console.log(err));
+        .catch(err=>PopError(err));
     function appendComment(newcomment)
     {
         var temp = state.data.filter(e=>e.WIP_ID == wipid)[0];
@@ -962,7 +959,7 @@ function echoBackShortComment(wipid,text){
 }
 function echoBackLongComment(wipid,text){
     var line = document.getElementById(wipid);
-    line.querySelector("input[name='LONG_TEXT']").value = text||"";
+    line.querySelector("textarea[name='LONG_TEXT']").value = text||"";
 }
 function htmlEncode(s) 
 {
@@ -982,30 +979,30 @@ function changeDisplayMode()
 
 function Navigate(e)
 {
-    console.log(e)
     var target = e.target;
-    switch(e.key)
+    if (target.tagName == "INPUT")
     {
-        case "ArrowUp": 
-            if (target.tagName == "INPUT")
-            {
+        switch(e.key)
+        {
+            case "ArrowUp": 
                 var input = target;
                 var line = parentLI(input);
                 var lines = document.querySelectorAll("li");
                 var ndx = Array.from(lines).indexOf(line);
                 if (ndx>0) Array.from(document.querySelectorAll("input[name='" + target.name + "']"))[ndx-1].focus();
-            }
-            break;
-        case "ArrowDown": 
-            if (target.tagName == "INPUT")
-            {
+                break;
+            case "ArrowDown": 
                 var input = target;
                 var line = parentLI(input);
                 var lines = document.querySelectorAll("li");
                 var ndx = Array.from(lines).indexOf(line);
                 if (ndx<lines.length-1) Array.from(document.querySelectorAll("input[name='" + target.name + "']"))[ndx+1].focus();
                 if (ndx==lines.length-1) ActionNew();
-            }
-            break;
+                break;
+        }
     }
+}
+
+function PopError(err,context){
+    console.log(err);
 }

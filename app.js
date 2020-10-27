@@ -493,6 +493,8 @@ function ActionNew()
         .then(json=>{
             state.data.push(json[0]);
             displaydata();
+            var lines = document.querySelectorAll("li");
+            lines[lines.length-1].querySelector("input[name='CUSTOMER_ID']").focus();
         })
         .catch(err=>console.log(err));
 }
@@ -976,4 +978,34 @@ function changeDisplayMode()
     displaymode=document.getElementById("mode").value;
     window.localStorage.setItem("mode",displaymode);
     reloadUserData();
+}
+
+function Navigate(e)
+{
+    console.log(e)
+    var target = e.target;
+    switch(e.key)
+    {
+        case "ArrowUp": 
+            if (target.tagName == "INPUT")
+            {
+                var input = target;
+                var line = parentLI(input);
+                var lines = document.querySelectorAll("li");
+                var ndx = Array.from(lines).indexOf(line);
+                if (ndx>0) Array.from(document.querySelectorAll("input[name='" + target.name + "']"))[ndx-1].focus();
+            }
+            break;
+        case "ArrowDown": 
+            if (target.tagName == "INPUT")
+            {
+                var input = target;
+                var line = parentLI(input);
+                var lines = document.querySelectorAll("li");
+                var ndx = Array.from(lines).indexOf(line);
+                if (ndx<lines.length-1) Array.from(document.querySelectorAll("input[name='" + target.name + "']"))[ndx+1].focus();
+                if (ndx==lines.length-1) ActionNew();
+            }
+            break;
+    }
 }
